@@ -1,0 +1,6 @@
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=4b3831b4_002Db758_002D4f27_002Dbc96_002D41b498932483/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="TheFirstRelationshipIsWrittenToTheFile" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
+  &lt;TestAncestor&gt;
+    &lt;TestId&gt;xUnit::7F55E155-F833-4CDB-B59F-14BF10FA59A1::net7.0::TimeGraphDatabase.Tests.StorageTests.TheFirstRelationshipIsWrittenToTheFile&lt;/TestId&gt;
+  &lt;/TestAncestor&gt;
+&lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>
