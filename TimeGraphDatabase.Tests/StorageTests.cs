@@ -138,3 +138,22 @@ public class StorageTests
                 .Concat(BitConverter.GetBytes(i3));
     }
 }
+
+
+/*
+ * INSERT TESTS
+ * Rows can be appended    ✅  
+ * Fillers are inserted at the end of the file  ✅
+ * Row can be inserted if lines up with a filler
+ * Row can be inserted by moving rows forward/backwards to the next filler
+ * Rows can be split into multiple file with they become full.
+ *
+ * DELETE TESTS  
+ * When rows are deleted they are replaced by a filler
+ *
+ *
+ * QUERY TESTS
+ * All entries in a single file < X
+ * All entries from split files < X
+ * Entries with predicate ( lhs, rhs, relation => bool )
+ */

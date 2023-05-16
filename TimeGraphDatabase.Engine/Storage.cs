@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-
 namespace TimeGraphDatabase.Engine;
 
 public class Storage
@@ -22,11 +20,11 @@ public class Storage
 
         if (numberOfRows >= FillFactor)
         {
-            var buffer = new byte[BytesPerRow];
+            var buffer = new byte[BytesPerRow];  //TODO:  move up into class var
             fillerNeeded = true;
+            file.Seek(-FillFactor * BytesPerRow, SeekOrigin.End);
             for (var lookBack = 1; lookBack <= FillFactor; lookBack++)
             {
-                file.Seek(-lookBack * BytesPerRow, SeekOrigin.End);
                 file.Read(buffer, 0, BytesPerRow);
                 if (buffer[0] == 0x0 && 
                     buffer[1] == 0x0 &&
