@@ -10,7 +10,7 @@ public class Storage
     public async ValueTask InsertRowAsync(StorageRecord record)
     {
         await using var file = File.Open(BackingFilePath(), FileMode.OpenOrCreate);  //TODO:  move up into class var
-        file.Seek(0, SeekOrigin.End);
+        
         
         // Before we can insert our row, we need to check if a filler row is required.
         // This is the case where we contain at least FillFactor rows,  and none of the
@@ -22,15 +22,12 @@ public class Storage
 
         if (numberOfRows >= FillFactor)
         {
-            fillerNeeded = true;
             var buffer = new byte[BytesPerRow];
-            var lookBack = FillFactor;
-            file.Seek(0, SeekOrigin.End);
-            while (lookBack >= 0)
+            fillerNeeded = true;
+            for (var lookBack = 1; lookBack <= FillFactor; lookBack++)
             {
-                file.Seek(-BytesPerRow, SeekOrigin.Current);
+                file.Seek(-lookBack * BytesPerRow, SeekOrigin.End);
                 file.Read(buffer, 0, BytesPerRow);
-                
                 if (buffer[0] == 0x0 && 
                     buffer[1] == 0x0 &&
                     buffer[2] == 0x0 &&
@@ -43,10 +40,10 @@ public class Storage
                     fillerNeeded = false;
                     break;
                 }
-                lookBack--;
             }
         }
-       
+        
+        file.Seek(0, SeekOrigin.End);
         if (fillerNeeded)
         {
             // Write the filler
