@@ -16,7 +16,7 @@ public class StorageTests
     {
         var record = new StorageRecord
         {
-            Timestamp = 10000,
+            Timestamp = 10000L,
             LhsId = 10001,
             RhsId = 10002,
             RelationshipId = 10003
@@ -31,9 +31,9 @@ public class StorageTests
         // ie.  each entry is 4 longs (4x8 bytes)
         var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
         var expected = BitConverter.GetBytes(10000L)
-               .Concat(BitConverter.GetBytes(10001L))
-               .Concat(BitConverter.GetBytes(10002L))
-               .Concat(BitConverter.GetBytes(10003L));
+               .Concat(BitConverter.GetBytes(10001))
+               .Concat(BitConverter.GetBytes(10002))
+               .Concat(BitConverter.GetBytes(10003));
         actual.Should().BeEquivalentTo(expected);
     }
     
@@ -43,16 +43,16 @@ public class StorageTests
         // Given a file already exists which contains all 1s for the first row.
         var dummyRow = new byte[]
         {
-            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+            0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF,
         };
         await File.WriteAllBytesAsync(Storage.BackingFilePath(), dummyRow);
         
         var record = new StorageRecord
         {
-            Timestamp = 10000,
+            Timestamp = 10000L,
             LhsId = 10001,
             RhsId = 10002,
             RelationshipId = 10003
@@ -72,9 +72,9 @@ public class StorageTests
                 
                 // New row
                 .Concat(BitConverter.GetBytes(10000L))
-                .Concat(BitConverter.GetBytes(10001L))
-                .Concat(BitConverter.GetBytes(10002L))
-                .Concat(BitConverter.GetBytes(10003L));
+                .Concat(BitConverter.GetBytes(10001))
+                .Concat(BitConverter.GetBytes(10002))
+                .Concat(BitConverter.GetBytes(10003));
         actual.Should().BeEquivalentTo(expected);
     }
     
@@ -84,7 +84,7 @@ public class StorageTests
         using (var storage = new Storage { FillFactor = 10 })
         {
             // Given the database contains 10 rows
-            for (ulong i = 1; i < 11; i++)
+            for (uint i = 1; i < 11; i++)
             {
                 await storage.InsertRowAsync(new StorageRecord
                 {
@@ -115,19 +115,19 @@ public class StorageTests
         // Then the file contains rows 1-10,  A Filler,  then Row 11, and then Row 12
         var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
         var expected =
-            AsRow(1,1,1,1)
-                .Concat(AsRow(2,2,2,2))
-                .Concat(AsRow(3,3,3,3))
-                .Concat(AsRow(4,4,4,4))
-                .Concat(AsRow(5,5,5,5))
-                .Concat(AsRow(6,6,6,6))
-                .Concat(AsRow(7,7,7,7))
-                .Concat(AsRow(8,8,8,8))
-                .Concat(AsRow(9,9,9,9))
-                .Concat(AsRow(10,10,10,10))
-                .Concat(AsRow(0,0,0,0))   // Filler
-                .Concat(AsRow(11,11,11,11))
-                .Concat(AsRow(12,12,12,12));
+            IsRow(1,1,1,1)
+                .Concat(IsRow(2,2,2,2))
+                .Concat(IsRow(3,3,3,3))
+                .Concat(IsRow(4,4,4,4))
+                .Concat(IsRow(5,5,5,5))
+                .Concat(IsRow(6,6,6,6))
+                .Concat(IsRow(7,7,7,7))
+                .Concat(IsRow(8,8,8,8))
+                .Concat(IsRow(9,9,9,9))
+                .Concat(IsRow(10,10,10,10))
+                .Concat(IsFiller())
+                .Concat(IsRow(11,11,11,11))
+                .Concat(IsRow(12,12,12,12));
         actual.Should().BeEquivalentTo(expected);
     }
 
@@ -136,9 +136,8 @@ public class StorageTests
     {
         using (var storage = new Storage { FillFactor = 10 })
         {
-
             // Given the database contains 10 rows
-            for (ulong i = 1; i < 11; i++)
+            for (uint i = 1; i < 11; i++)
             {
                 await storage.InsertRowAsync(new StorageRecord
                 {
@@ -161,22 +160,22 @@ public class StorageTests
         // Then the file has the 3rd row replaced a filler
         var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
         var expected =
-            AsRow(1,1,1,1)
-                .Concat(AsRow(2,2,2,2))
-                .Concat(AsRow(0,0,0,0))   // Filler
-                .Concat(AsRow(4,4,4,4))
-                .Concat(AsRow(5,5,5,5))
-                .Concat(AsRow(6,6,6,6))
-                .Concat(AsRow(7,7,7,7))
-                .Concat(AsRow(8,8,8,8))
-                .Concat(AsRow(9,9,9,9))
-                .Concat(AsRow(10,10,10,10));
+            IsRow(1,1,1,1)
+                .Concat(IsRow(2,2,2,2))
+                .Concat(IsFiller()) 
+                .Concat(IsRow(4,4,4,4))
+                .Concat(IsRow(5,5,5,5))
+                .Concat(IsRow(6,6,6,6))
+                .Concat(IsRow(7,7,7,7))
+                .Concat(IsRow(8,8,8,8))
+                .Concat(IsRow(9,9,9,9))
+                .Concat(IsRow(10,10,10,10));
         actual.Should().BeEquivalentTo(expected);
         
-        // DATA DRIVEN TEST
+        // DATA DRIVEN TEST WHERE FILLERS EXIST
     }
     
-    private static IEnumerable<byte> AsRow(ulong i, ulong i1, ulong i2, ulong i3)
+    private static IEnumerable<byte> IsRow(ulong i, uint i1, uint i2, uint i3)
     {
         return BitConverter.GetBytes(i)
                 .Concat(BitConverter.GetBytes(i1))
@@ -184,9 +183,7 @@ public class StorageTests
                 .Concat(BitConverter.GetBytes(i3));
     }
 
-    public void Dispose()
-    {
-    }
+    private static IEnumerable<byte> IsFiller() => IsRow(0, 0, 0, 0);
 }
 
 

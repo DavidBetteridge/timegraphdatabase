@@ -6,7 +6,7 @@ public class Storage : IDisposable
 {
     private readonly FileStream _file;
     private int _numberOfRows;
-    private const int BytesPerRow = 8 * 4;  //TODO:  ulongs or uints?
+    private const int BytesPerRow = 8 + 4 + 4 + 4;
     public int FillFactor { get; init; } = 10;
     private byte[] _buffer = new byte[BytesPerRow];
     public Storage()
@@ -56,17 +56,17 @@ public class Storage : IDisposable
             // Write the filler
             _file.Seek(0, SeekOrigin.End);
             await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 8));
-            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 8));
-            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 8));
-            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 8));
+            await _file.WriteAsync(BitConverter.GetBytes(0).AsMemory(0, 4));
+            await _file.WriteAsync(BitConverter.GetBytes(0).AsMemory(0, 4));
+            await _file.WriteAsync(BitConverter.GetBytes(0).AsMemory(0, 4));
             _numberOfRows++;
         }
   
         _file.Seek(0, SeekOrigin.End);
         await _file.WriteAsync(BitConverter.GetBytes(record.Timestamp).AsMemory(0, 8));
-        await _file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 8));
-        await _file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 8));
-        await _file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 8));
+        await _file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 4));
+        await _file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 4));
+        await _file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 4));
         _numberOfRows++;
     }
     
@@ -103,9 +103,9 @@ public class Storage : IDisposable
             // Found
             _file.Seek(L * BytesPerRow, SeekOrigin.Begin);
             await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 8));
-            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 8));
-            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 8));
-            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 8));
+            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 4));
+            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 4));
+            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 4));
         }
         else
         {

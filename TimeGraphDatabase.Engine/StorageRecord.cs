@@ -1,3 +1,3 @@
 namespace TimeGraphDatabase.Engine;
 
-public readonly record struct StorageRecord(ulong Timestamp, ulong LhsId, ulong RhsId, ulong RelationshipId);
+public readonly record struct StorageRecord(ulong Timestamp, uint LhsId, uint RhsId, uint RelationshipId);
