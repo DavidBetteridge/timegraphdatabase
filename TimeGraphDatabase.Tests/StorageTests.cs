@@ -131,8 +131,18 @@ public class StorageTests
         actual.Should().BeEquivalentTo(expected);
     }
 
-    [Fact]
-    public async Task DeletingARowReplacesItWithAFiller()
+    [Theory]
+    [InlineData(1, new uint[] {0,2,3,4,5,6,7,8,9,10})]
+    [InlineData(2, new uint[] {1,0,3,4,5,6,7,8,9,10})]
+    [InlineData(3, new uint[] {1,2,0,4,5,6,7,8,9,10})]
+    [InlineData(4, new uint[] {1,2,3,0,5,6,7,8,9,10})]
+    [InlineData(5, new uint[] {1,2,3,4,0,6,7,8,9,10})]
+    [InlineData(6, new uint[] {1,2,3,4,5,0,7,8,9,10})]
+    [InlineData(7, new uint[] {1,2,3,4,5,6,0,8,9,10})]
+    [InlineData(8, new uint[] {1,2,3,4,5,6,7,0,9,10})]
+    [InlineData(9, new uint[] {1,2,3,4,5,6,7,8,0,10})]
+    [InlineData(10, new uint[] {1,2,3,4,5,6,7,8,9,0})]
+    public async Task DeletingARowReplacesItWithAFiller(uint rowToDelete, uint[] expectedRows)
     {
         using (var storage = new Storage { FillFactor = 10 })
         {
@@ -150,29 +160,23 @@ public class StorageTests
 
             await storage.DeleteRowAsync(new StorageRecord
             {
-                Timestamp = 3,
-                LhsId = 3,
-                RhsId = 3,
-                RelationshipId = 3
+                Timestamp = rowToDelete,
+                LhsId = rowToDelete,
+                RhsId = rowToDelete,
+                RelationshipId = rowToDelete
             });
         }
 
-        // Then the file has the 3rd row replaced a filler
         var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
-        var expected =
-            IsRow(1,1,1,1)
-                .Concat(IsRow(2,2,2,2))
-                .Concat(IsFiller()) 
-                .Concat(IsRow(4,4,4,4))
-                .Concat(IsRow(5,5,5,5))
-                .Concat(IsRow(6,6,6,6))
-                .Concat(IsRow(7,7,7,7))
-                .Concat(IsRow(8,8,8,8))
-                .Concat(IsRow(9,9,9,9))
-                .Concat(IsRow(10,10,10,10));
+
+        var expected = IsRow(expectedRows[0], expectedRows[0], expectedRows[0], expectedRows[0]);
+        for (var i = 1; i < expectedRows.Length; i++)
+        {
+            expected = expected.Concat(
+                IsRow(expectedRows[i], expectedRows[i], expectedRows[i], expectedRows[i])
+                );
+        }
         actual.Should().BeEquivalentTo(expected);
-        
-        // DATA DRIVEN TEST WHERE FILLERS EXIST
     }
     
     private static IEnumerable<byte> IsRow(ulong i, uint i1, uint i2, uint i3)
