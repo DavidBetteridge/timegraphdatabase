@@ -203,7 +203,7 @@ public class StorageTests
  * Rows can be split into multiple file with they become full.
  *
  * DELETE TESTS  
- * When rows are deleted they are replaced by a filler
+ * When rows are deleted they are replaced by a filler  ✅
  *
  *
  * QUERY TESTS

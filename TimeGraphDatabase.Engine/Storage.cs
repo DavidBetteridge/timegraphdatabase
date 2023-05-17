@@ -22,6 +22,18 @@ public class Storage : IDisposable
     
     public async ValueTask InsertRowAsync(StorageRecord record)
     {
+        // Work out the location to insert our row.  We do a binary search until we
+        // a.  Find that we are the earliest entry in the file X < A[0]
+        // b.  Find that we are the last entry in the file  X > A[n]
+        // c.  Find the location in the file with  A[n] < X < A[n+1] (fillers can exist between A[n] and A[n+1])
+        // d.  We already exist in the file.  ie.  A[n] == X
+        
+        // For cases a and c,  we then shuffle the closest filler into the desired location. 
+        // Replace the filler with our new row.
+        // For b,  we add to the end of the file,  with a filler as required.
+        // For d,  we exit
+        
+        
         // Before we can insert our row, we need to check if a filler row is required.
         // This is the case where we contain at least FillFactor rows,  and none of the
         // last FillFactor rows are fillers.
@@ -86,7 +98,7 @@ public class Storage : IDisposable
         _file.Read(_buffer, 0, BytesPerRow);
     }
     
-    public async Task DeleteRowAsync(StorageRecord storageRecord)
+    public async Task<bool> DeleteRowAsync(StorageRecord storageRecord)
     {
         var toDelete = BitConverter.GetBytes(storageRecord.Timestamp)
             .Concat(BitConverter.GetBytes(storageRecord.LhsId))
@@ -110,7 +122,6 @@ public class Storage : IDisposable
             if (BufferContainsFiller())
             {
                 m = (int)Math.Ceiling((L + R) / 2.0);
-                ReadRowIntoBuffer(m);
                 while (BufferContainsFiller() && m > L)
                 {
                     m--;
@@ -119,7 +130,7 @@ public class Storage : IDisposable
             }
 
             if (BufferContainsFiller())
-                return;
+                return false;
             
             
             if (_buffer.Compare(toDelete) > 0)
@@ -138,10 +149,12 @@ public class Storage : IDisposable
             // Found
             _file.Seek(L * BytesPerRow, SeekOrigin.Begin);
             await WriteFillerAtCurrentLocation();
+            return true;
         }
         else
         {
             // Not found
+            return false;
         }
     }
 
