@@ -4,6 +4,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TimeGraphDatabase.Engine", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TimeGraphDatabase.Tests", "TimeGraphDatabase.Tests\TimeGraphDatabase.Tests.csproj", "{7F55E155-F833-4CDB-B59F-14BF10FA59A1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TimeGraphDatabase.Visualiser", "TimeGraphDatabase.Visualiser\TimeGraphDatabase.Visualiser.csproj", "{CF945EAD-38D6-4317-8042-F124D6302FFD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{7F55E155-F833-4CDB-B59F-14BF10FA59A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7F55E155-F833-4CDB-B59F-14BF10FA59A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7F55E155-F833-4CDB-B59F-14BF10FA59A1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CF945EAD-38D6-4317-8042-F124D6302FFD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CF945EAD-38D6-4317-8042-F124D6302FFD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CF945EAD-38D6-4317-8042-F124D6302FFD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CF945EAD-38D6-4317-8042-F124D6302FFD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

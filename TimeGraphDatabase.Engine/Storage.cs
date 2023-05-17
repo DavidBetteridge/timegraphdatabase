@@ -6,7 +6,7 @@ public class Storage : IDisposable
 {
     private readonly FileStream _file;
     private int _numberOfRows;
-    private const int BytesPerRow = 8 + 4 + 4 + 4;
+    public static int BytesPerRow = 8 + 4 + 4 + 4;
     public int FillFactor { get; init; } = 10;
     private readonly byte[] _buffer = new byte[BytesPerRow];
     public Storage()
