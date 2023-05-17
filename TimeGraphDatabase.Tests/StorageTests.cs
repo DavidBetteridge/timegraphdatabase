@@ -8,9 +8,9 @@ public class StorageTests
     public StorageTests()
     {
         // Given no file currently exists
-        File.Delete(Storage.BackingFilePath()); 
+        File.Delete(Storage.BackingFilePath());
     }
-    
+
     [Fact]
     public async Task TheFirstRelationshipIsWrittenToTheFile()
     {
@@ -21,7 +21,7 @@ public class StorageTests
             RhsId = 10002,
             RelationshipId = 10003
         };
-        
+
         using (var storage = new Storage())
         {
             await storage.InsertRowAsync(record);
@@ -31,25 +31,25 @@ public class StorageTests
         // ie.  each entry is 4 longs (4x8 bytes)
         var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
         var expected = BitConverter.GetBytes(10000L)
-               .Concat(BitConverter.GetBytes(10001))
-               .Concat(BitConverter.GetBytes(10002))
-               .Concat(BitConverter.GetBytes(10003));
+            .Concat(BitConverter.GetBytes(10001))
+            .Concat(BitConverter.GetBytes(10002))
+            .Concat(BitConverter.GetBytes(10003));
         actual.Should().BeEquivalentTo(expected);
     }
-    
+
     [Fact]
     public async Task TheMostRecentRelationshipIsAddedToTheEndOfTheFile()
     {
         // Given a file already exists which contains all 1s for the first row.
         var dummyRow = new byte[]
         {
-            0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
             0xFF, 0xFF, 0xFF, 0xFF,
             0xFF, 0xFF, 0xFF, 0xFF,
             0xFF, 0xFF, 0xFF, 0xFF,
         };
         await File.WriteAllBytesAsync(Storage.BackingFilePath(), dummyRow);
-        
+
         var record = new StorageRecord
         {
             Timestamp = 10000L,
@@ -57,7 +57,7 @@ public class StorageTests
             RhsId = 10002,
             RelationshipId = 10003
         };
-        
+
         using (var storage = new Storage())
         {
             await storage.InsertRowAsync(record);
@@ -66,10 +66,10 @@ public class StorageTests
         // Entries are in the format:  Timestamp LhsId RhsId RelationshipId
         // ie.  each entry is 4 longs (4x8 bytes)
         var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
-        var expected = 
-                // Dummy first row
-                dummyRow
-                
+        var expected =
+            // Dummy first row
+            dummyRow
+
                 // New row
                 .Concat(BitConverter.GetBytes(10000L))
                 .Concat(BitConverter.GetBytes(10001))
@@ -77,7 +77,7 @@ public class StorageTests
                 .Concat(BitConverter.GetBytes(10003));
         actual.Should().BeEquivalentTo(expected);
     }
-    
+
     [Fact]
     public async Task BlocksOfTenRowsAreBrokenUpByFillerRows()
     {
@@ -115,46 +115,45 @@ public class StorageTests
         // Then the file contains rows 1-10,  A Filler,  then Row 11, and then Row 12
         var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
         var expected =
-            IsRow(1,1,1,1)
-                .Concat(IsRow(2,2,2,2))
-                .Concat(IsRow(3,3,3,3))
-                .Concat(IsRow(4,4,4,4))
-                .Concat(IsRow(5,5,5,5))
-                .Concat(IsRow(6,6,6,6))
-                .Concat(IsRow(7,7,7,7))
-                .Concat(IsRow(8,8,8,8))
-                .Concat(IsRow(9,9,9,9))
-                .Concat(IsRow(10,10,10,10))
+            IsRow(1, 1, 1, 1)
+                .Concat(IsRow(2, 2, 2, 2))
+                .Concat(IsRow(3, 3, 3, 3))
+                .Concat(IsRow(4, 4, 4, 4))
+                .Concat(IsRow(5, 5, 5, 5))
+                .Concat(IsRow(6, 6, 6, 6))
+                .Concat(IsRow(7, 7, 7, 7))
+                .Concat(IsRow(8, 8, 8, 8))
+                .Concat(IsRow(9, 9, 9, 9))
+                .Concat(IsRow(10, 10, 10, 10))
                 .Concat(IsFiller())
-                .Concat(IsRow(11,11,11,11))
-                .Concat(IsRow(12,12,12,12));
+                .Concat(IsRow(11, 11, 11, 11))
+                .Concat(IsRow(12, 12, 12, 12));
         actual.Should().BeEquivalentTo(expected);
     }
 
     [Theory]
-    [InlineData(1, new uint[] {0,2,3,4,5,6,7,8,9,10})]
-    [InlineData(2, new uint[] {1,0,3,4,5,6,7,8,9,10})]
-    [InlineData(3, new uint[] {1,2,0,4,5,6,7,8,9,10})]
-    [InlineData(4, new uint[] {1,2,3,0,5,6,7,8,9,10})]
-    [InlineData(5, new uint[] {1,2,3,4,0,6,7,8,9,10})]
-    [InlineData(6, new uint[] {1,2,3,4,5,0,7,8,9,10})]
-    [InlineData(7, new uint[] {1,2,3,4,5,6,0,8,9,10})]
-    [InlineData(8, new uint[] {1,2,3,4,5,6,7,0,9,10})]
-    [InlineData(9, new uint[] {1,2,3,4,5,6,7,8,0,10})]
-    [InlineData(10, new uint[] {1,2,3,4,5,6,7,8,9,0})]
-    public async Task DeletingARowReplacesItWithAFiller(uint rowToDelete, uint[] expectedRows)
+    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 1, new uint[] { 0, 2, 3, 4, 5, 6, 7, 8, 9, 10 })]
+    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 2, new uint[] { 1, 0, 3, 4, 5, 6, 7, 8, 9, 10 })]
+    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 3, new uint[] { 1, 2, 0, 4, 5, 6, 7, 8, 9, 10 })]
+    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 4, new uint[] { 1, 2, 3, 0, 5, 6, 7, 8, 9, 10 })]
+    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 5, new uint[] { 1, 2, 3, 4, 0, 6, 7, 8, 9, 10 })]
+    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 6, new uint[] { 1, 2, 3, 4, 5, 0, 7, 8, 9, 10 })]
+    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 7, new uint[] { 1, 2, 3, 4, 5, 6, 0, 8, 9, 10 })]
+    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 8, new uint[] { 1, 2, 3, 4, 5, 6, 7, 0, 9, 10 })]
+    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 9, new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 0, 10 })]
+    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 10, new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 })]
+    public async Task DeletingARowReplacesItWithAFiller(uint[] initialRows, uint rowToDelete, uint[] expectedRows)
     {
         using (var storage = new Storage { FillFactor = 10 })
         {
-            // Given the database contains 10 rows
-            for (uint i = 1; i < 11; i++)
+            foreach (var initialRow in initialRows)
             {
                 await storage.InsertRowAsync(new StorageRecord
                 {
-                    Timestamp = i,
-                    LhsId = i,
-                    RhsId = i,
-                    RelationshipId = i
+                    Timestamp = initialRow,
+                    LhsId = initialRow,
+                    RhsId = initialRow,
+                    RelationshipId = initialRow
                 });
             }
 
@@ -174,17 +173,18 @@ public class StorageTests
         {
             expected = expected.Concat(
                 IsRow(expectedRows[i], expectedRows[i], expectedRows[i], expectedRows[i])
-                );
+            );
         }
+
         actual.Should().BeEquivalentTo(expected);
     }
-    
+
     private static IEnumerable<byte> IsRow(ulong i, uint i1, uint i2, uint i3)
     {
         return BitConverter.GetBytes(i)
-                .Concat(BitConverter.GetBytes(i1))
-                .Concat(BitConverter.GetBytes(i2))
-                .Concat(BitConverter.GetBytes(i3));
+            .Concat(BitConverter.GetBytes(i1))
+            .Concat(BitConverter.GetBytes(i2))
+            .Concat(BitConverter.GetBytes(i3));
     }
 
     private static IEnumerable<byte> IsFiller() => IsRow(0, 0, 0, 0);
