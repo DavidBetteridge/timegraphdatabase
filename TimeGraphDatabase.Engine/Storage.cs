@@ -8,7 +8,7 @@ public class Storage : IDisposable
     private int _numberOfRows;
     private const int BytesPerRow = 8 + 4 + 4 + 4;
     public int FillFactor { get; init; } = 10;
-    private byte[] _buffer = new byte[BytesPerRow];
+    private readonly byte[] _buffer = new byte[BytesPerRow];
     public Storage()
     {
         if (File.Exists(BackingFilePath()))
@@ -36,14 +36,7 @@ public class Storage : IDisposable
             for (var lookBack = 1; lookBack <= FillFactor; lookBack++)
             {
                 _file.Read(_buffer, 0, BytesPerRow);
-                if (_buffer[0] == 0x0 &&
-                    _buffer[1] == 0x0 &&
-                    _buffer[2] == 0x0 &&
-                    _buffer[3] == 0x0 &&
-                    _buffer[4] == 0x0 &&
-                    _buffer[5] == 0x0 &&
-                    _buffer[6] == 0x0 &&
-                    _buffer[7] == 0x0)
+                if (BufferContainsFiller())
                 {
                     fillerNeeded = false;
                     break;
@@ -55,10 +48,7 @@ public class Storage : IDisposable
         {
             // Write the filler
             _file.Seek(0, SeekOrigin.End);
-            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 8));
-            await _file.WriteAsync(BitConverter.GetBytes(0).AsMemory(0, 4));
-            await _file.WriteAsync(BitConverter.GetBytes(0).AsMemory(0, 4));
-            await _file.WriteAsync(BitConverter.GetBytes(0).AsMemory(0, 4));
+            await WriteFillerAtCurrentLocation();
             _numberOfRows++;
         }
   
@@ -68,6 +58,32 @@ public class Storage : IDisposable
         await _file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 4));
         await _file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 4));
         _numberOfRows++;
+    }
+
+    private async Task WriteFillerAtCurrentLocation()
+    {
+        await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 8));
+        await _file.WriteAsync(BitConverter.GetBytes(0).AsMemory(0, 4));
+        await _file.WriteAsync(BitConverter.GetBytes(0).AsMemory(0, 4));
+        await _file.WriteAsync(BitConverter.GetBytes(0).AsMemory(0, 4));
+    }
+
+    private bool BufferContainsFiller()
+    {
+        return _buffer[0] == 0x0 &&
+               _buffer[1] == 0x0 &&
+               _buffer[2] == 0x0 &&
+               _buffer[3] == 0x0 &&
+               _buffer[4] == 0x0 &&
+               _buffer[5] == 0x0 &&
+               _buffer[6] == 0x0 &&
+               _buffer[7] == 0x0;
+    }
+
+    private void ReadRowIntoBuffer(int rowNumber)
+    {
+        _file.Seek(rowNumber * BytesPerRow, SeekOrigin.Begin);
+        _file.Read(_buffer, 0, BytesPerRow);
     }
     
     public async Task DeleteRowAsync(StorageRecord storageRecord)
@@ -83,9 +99,29 @@ public class Storage : IDisposable
         while (L != R)
         {
             var m = (int)Math.Ceiling((L + R) / 2.0);
-            _file.Seek(m * BytesPerRow, SeekOrigin.Begin);
-            _file.Read(_buffer, 0, BytesPerRow);
+            ReadRowIntoBuffer(m);
+            
+            while (BufferContainsFiller() && m < R)
+            {
+                m++;
+                ReadRowIntoBuffer(m);
+            }
 
+            if (BufferContainsFiller())
+            {
+                m = (int)Math.Ceiling((L + R) / 2.0);
+                ReadRowIntoBuffer(m);
+                while (BufferContainsFiller() && m > L)
+                {
+                    m--;
+                    ReadRowIntoBuffer(m);
+                }
+            }
+
+            if (BufferContainsFiller())
+                return;
+            
+            
             if (_buffer.Compare(toDelete) > 0)
             {
                 R = m - 1;
@@ -95,17 +131,13 @@ public class Storage : IDisposable
                 L = m;
             }
         }
-
-        _file.Seek(L * BytesPerRow, SeekOrigin.Begin);
-        _file.Read(_buffer, 0, BytesPerRow);
+        
+        ReadRowIntoBuffer(L);
         if (_buffer.Compare(toDelete) == 0)
         {
             // Found
             _file.Seek(L * BytesPerRow, SeekOrigin.Begin);
-            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 8));
-            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 4));
-            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 4));
-            await _file.WriteAsync(BitConverter.GetBytes(0L).AsMemory(0, 4));
+            await WriteFillerAtCurrentLocation();
         }
         else
         {

@@ -142,6 +142,9 @@ public class StorageTests
     [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 8, new uint[] { 1, 2, 3, 4, 5, 6, 7, 0, 9, 10 })]
     [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 9, new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 0, 10 })]
     [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 10, new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 })]
+    [InlineData(new uint[] { 1, 2, 3, 4, 0, 6, 7, 8, 9, 10 }, 10, new uint[] { 1, 2, 3, 4, 0, 6, 7, 8, 9, 0 })]
+    [InlineData(new uint[] { 1, 2, 3, 4, 0, 6, 7, 8, 9, 10 }, 11, new uint[] { 1, 2, 3, 4, 0, 6, 7, 8, 9, 10 })]
+    [InlineData(new uint[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 11, new uint[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 })]
     public async Task DeletingARowReplacesItWithAFiller(uint[] initialRows, uint rowToDelete, uint[] expectedRows)
     {
         using (var storage = new Storage { FillFactor = 10 })
