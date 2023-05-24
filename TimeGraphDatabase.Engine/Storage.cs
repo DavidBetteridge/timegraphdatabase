@@ -19,6 +19,76 @@ public class Storage : IDisposable
         
         _file = File.Open(BackingFilePath(), FileMode.OpenOrCreate);
     }
+
+    public async ValueTask DefragAsync()
+    {
+        // How many fillers to we currently have?
+        var numberOfFillers = 0;
+        for (int i = 0; i < _numberOfRows; i++)
+        {
+            ReadRowIntoBuffer(i);
+            if (BufferContainsFiller())
+                numberOfFillers++;
+        }
+        
+        // How many should we have?
+        var idealNumberOfFillers = numberOfFillers / FillFactor;
+        var numberMissing = idealNumberOfFillers - numberOfFillers;
+
+        // Add the missing fillers to the end of our file.
+        while (numberMissing > 0)
+        {
+            _file.Seek(0, SeekOrigin.End);
+            await WriteFillerAtCurrentLocation();
+            _numberOfRows++;
+            numberMissing--;
+        }
+
+        if (numberMissing >= 0)
+        {
+            var nextRead = _numberOfRows;
+            var nextWrite = _numberOfRows;
+
+            while (nextWrite >= 0)
+            {
+                if (nextRead < 0) nextRead = 0;
+                
+                // Advance nextRead until we find a value which isn't a filler.
+                ReadRowIntoBuffer(nextRead);
+                while (nextRead > 0 && BufferContainsFiller())
+                {
+                    nextRead--;
+                }
+
+                ReadRowIntoBuffer(nextWrite);
+                var currentWriteIsFiller = BufferContainsFiller();
+                var currentWriteShouldBeAFiller = nextWrite % (FillFactor + 1) == FillFactor;
+
+                if (currentWriteIsFiller && currentWriteShouldBeAFiller)
+                {
+                    // All good
+                    nextWrite--;
+                }
+                else if (!currentWriteShouldBeAFiller)
+                {
+                    // Write contents of nextRead to nextWrite
+                    ReadRowIntoBuffer(nextRead);
+                    _file.Seek(nextWrite * BytesPerRow, SeekOrigin.Begin);
+                    await _file.WriteAsync(_buffer);
+
+                    nextRead--;
+                    nextWrite--;
+                }
+                else if (!currentWriteIsFiller && currentWriteShouldBeAFiller)
+                {
+                    // Write filler to nextWrite
+                    _file.Seek(nextWrite * BytesPerRow, SeekOrigin.Begin);
+                    await WriteFillerAtCurrentLocation();
+                    nextWrite--;
+                }
+            }
+        }
+    }
     
     public async ValueTask InsertRowAsync(StorageRecord record)
     {

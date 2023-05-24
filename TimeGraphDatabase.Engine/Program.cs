@@ -3,22 +3,25 @@ var nodes = new Dictionary<long, Node>();
 var relations = new Dictionary<long, Relation>();
 var idProvider = new IdProvider();
 
-var david = new Node { Label = "David", _id = idProvider.Next()};
-nodes.Add(david._id, david);
+var mary = new Node { Label = "Mary", _id = idProvider.Next()};
+nodes.Add(mary._id, mary);
 
-var codeAndCoffee = new Node { Label = "Code and Coffee", _id = idProvider.Next() };
-nodes.Add(codeAndCoffee._id, codeAndCoffee);
-    
-var isMember = new Relation {Label  = "Is member", _id = idProvider.Next()};
-relations.Add(isMember._id, isMember);
+var edward = new Node { Label = "Edward", _id = idProvider.Next()};
+nodes.Add(edward._id, edward);
+
+var shipped = new Relation { Label = "Shipped", _id = idProvider.Next() };
+relations.Add(shipped._id, shipped);
+   
+var filrting = new Relation { Label = "Shipped", _id = idProvider.Next() };
+relations.Add(shipped._id, shipped);
 
 
 var groupMember = new Relationship
 {
-    Timestamp = DateTimeOffset.UtcNow,
-    LHS = david,
-    RHS = codeAndCoffee,
-    Relation = isMember
+    Timestamp = DateTimeOffset.UtcNow.AddDays(1),
+    LHS = mary,
+    RHS = edward,
+    Relation = shipped
 };
 relationships.Add(groupMember);
 

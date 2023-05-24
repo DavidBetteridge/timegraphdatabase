@@ -2,7 +2,7 @@
 using TimeGraphDatabase.Engine;
 
 File.Delete(Storage.BackingFilePath());
-using (var storage = new Storage { FillFactor = 10 })
+using (var storage = new Storage { FillFactor = 1000 })
 {
     for (uint i = 0; i < 100; i++)
     {
@@ -14,6 +14,11 @@ using (var storage = new Storage { FillFactor = 10 })
             RelationshipId = i
         });  
     }
+}
+
+using (var storage = new Storage { FillFactor = 10 })
+{ 
+    await storage.DefragAsync();
 }
 
 var fileContents = await File.ReadAllBytesAsync(Storage.BackingFilePath());
