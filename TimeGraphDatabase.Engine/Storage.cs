@@ -152,6 +152,125 @@ public class Storage : IDisposable
 
     public async ValueTask InsertRowAsync(StorageRecord record)
     {
+        var toInsert = record.ToByteArray();
+        
+        //////////////////////////////////////////////////////////////
+        // Simple case - an empty file.
+        if (_numberOfRows == 0)
+        {
+            await InsertRecordAtEndOfFile(record);
+            return;
+        }
+        
+        //////////////////////////////////////////////////////////////
+        // Preferred case, inserting a row at the end of the file.
+        
+        // Work back from the end of the file to find the first row which doesn't contain a filler.
+        var lastNoneFillerRowNumber = _numberOfRows - 1;
+        ReadRowIntoBuffer(lastNoneFillerRowNumber);
+        while (lastNoneFillerRowNumber >= 0 && BufferContainsFiller())
+        {
+            lastNoneFillerRowNumber--;
+            ReadRowIntoBuffer(lastNoneFillerRowNumber);
+        }
+
+        if (lastNoneFillerRowNumber == -1)
+        {
+            // The file only contains fillers.  So we can write our record anywhere.
+            OverwriteRow(record, 0);
+            return;
+        }
+        
+        if (_buffer.Compare(toInsert) < 0)
+        {
+            // The last value in the file comes before ours.
+            if (lastNoneFillerRowNumber == _numberOfRows - 1)
+            {
+                // We need to add a row to the end of the file
+                await InsertRecordAtEndOfFile(record);
+                return;
+            }
+            else
+            {
+                // Replace the first filler after the final populated row with our row.
+                OverwriteRow(record, lastNoneFillerRowNumber+1);
+                return;
+            }
+        }
+        
+        
+        //////////////////////////////////////////////////////////////
+        // Now we have to insert the value mid-file.  Find the location
+        // using a binary search,  allowing for fillers.
+
+
+        
+        // To insert   A
+        
+        //  x[n] < A and x[n+1] > A  (ignoring fillers)
+        //  Find closest filler to n
+        
+        // Are fillers more dense to the left or right
+        // and then bubble in that direction.
+        
+        // Use a binary search to find the gap to insert the new row into.
+        var L = 0;
+        var R = _numberOfRows - 1;
+        var solutionFound = false;
+        while (L != R && !solutionFound)
+        {
+            var m = (int)Math.Ceiling((L + R) / 2.0);
+
+            // while (BufferContainsFiller() && m < R)
+            // {
+            //     m++;
+            //     ReadRowIntoBuffer(m);
+            // }
+            //
+            // if (BufferContainsFiller())
+            // {
+            //     m = (int)Math.Ceiling((L + R) / 2.0);
+            //     while (BufferContainsFiller() && m > L)
+            //     {
+            //         m--;
+            //         ReadRowIntoBuffer(m);
+            //     }
+            // }
+
+            // if (BufferContainsFiller())
+            //     return false;
+
+            // Simple case.
+            // X[m-1] <= toInsert and X[m+1] > to_insert and x[m] is a filler
+            // If X[m-1] > toInsert then R = m-1
+            // If X[m+1] < toInsert then L = m
+
+            solutionFound = true;
+            ReadRowIntoBuffer(m - 1);
+            if (_buffer.Compare(toInsert) > 0)
+            {
+                // Our guess is too large.
+                R = m - 1;
+                solutionFound = false;
+            }
+
+            ReadRowIntoBuffer(m + 1);
+            if (_buffer.Compare(toInsert) < 0)
+            {
+                // Our guess is too small.
+                L = m;
+                solutionFound = false;
+            }
+            
+            if (solutionFound)
+            {
+                // Insert the row at location m
+                await OverwriteRow(record, m);
+                return;
+            }
+        }
+
+
         // Work out the location to insert our row.  We do a binary search until we
         // a.  Find that we are the earliest entry in the file X < A[0]
         // b.  Find that we are the last entry in the file  X > A[n]
@@ -162,17 +281,33 @@ public class Storage : IDisposable
         // Replace the filler with our new row.
         // For b,  we add to the end of the file,  with a filler as required.
         // For d,  we exit
-        
-        
+        _file.Seek(0, SeekOrigin.End);
+        await _file.WriteAsync(BitConverter.GetBytes(record.Timestamp).AsMemory(0, 8));
+        await _file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 4));
+        await _file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 4));
+        await _file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 4));
+        _numberOfRows++;
+    }
+
+    private async Task OverwriteRow(StorageRecord record, int m)
+    {
+        _file.Seek(m * BytesPerRow, SeekOrigin.Begin);
+        await _file.WriteAsync(BitConverter.GetBytes(record.Timestamp).AsMemory(0, 8));
+        await _file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 4));
+        await _file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 4));
+        await _file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 4));
+    }
+
+    private async Task InsertRecordAtEndOfFile(StorageRecord record)
+    {
         // Before we can insert our row, we need to check if a filler row is required.
         // This is the case where we contain at least FillFactor rows,  and none of the
         // last FillFactor rows are fillers.
-        // TODO: Keep track of last fill factor
+
         var fillerNeeded = false;
 
         if (_numberOfRows >= FillFactor)
         {
-
             fillerNeeded = true;
             _file.Seek(-FillFactor * BytesPerRow, SeekOrigin.End);
             for (var lookBack = 1; lookBack <= FillFactor; lookBack++)
@@ -193,7 +328,8 @@ public class Storage : IDisposable
             await WriteFillerAtCurrentLocation();
             _numberOfRows++;
         }
-  
+        
+        // Now we can insert our actual record
         _file.Seek(0, SeekOrigin.End);
         await _file.WriteAsync(BitConverter.GetBytes(record.Timestamp).AsMemory(0, 8));
         await _file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 4));
@@ -230,10 +366,7 @@ public class Storage : IDisposable
     
     public async Task<bool> DeleteRowAsync(StorageRecord storageRecord)
     {
-        var toDelete = BitConverter.GetBytes(storageRecord.Timestamp)
-            .Concat(BitConverter.GetBytes(storageRecord.LhsId))
-            .Concat(BitConverter.GetBytes(storageRecord.RhsId))
-            .Concat(BitConverter.GetBytes(storageRecord.RelationshipId)).ToArray();
+        var toDelete = storageRecord.ToByteArray();
         
         // Find the row to delete using a binary search
         var L = 0;

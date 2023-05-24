@@ -191,6 +191,65 @@ public class StorageTests
     }
 
     private static IEnumerable<byte> IsFiller() => IsRow(0, 0, 0, 0);
+
+    [Fact]
+    public async Task RowsCanBeInsertedAtAFillerLocation()
+    {
+        // Given a file containing three rows:  1, FILLER, 3
+        await InsertAtEndOfFile(new StorageRecord
+        {
+            Timestamp = 1,
+            LhsId = 1,
+            RhsId = 1,
+            RelationshipId = 1
+        });
+        
+        await InsertAtEndOfFile(new StorageRecord
+        {
+            Timestamp = 0,
+            LhsId = 0,
+            RhsId = 0,
+            RelationshipId = 0
+        });
+        
+        await InsertAtEndOfFile(new StorageRecord
+        {
+            Timestamp = 3,
+            LhsId = 3,
+            RhsId = 3,
+            RelationshipId = 3
+        });
+        
+        // When a row at time 2 is inserted
+        using (var storage = new Storage { FillFactor = 10 })
+        {
+            await storage.InsertRowAsync(new StorageRecord
+            {
+                Timestamp = 2,
+                LhsId = 2,
+                RhsId = 2,
+                RelationshipId = 2
+            });
+        }
+
+        // Then the file contains 1, 2, 3
+        var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
+        var expected =
+            IsRow(1, 1, 1, 1)
+                .Concat(IsRow(2, 2, 2, 2))
+                .Concat(IsRow(3, 3, 3, 3));
+        actual.Should().BeEquivalentTo(expected);
+    }
+
+    private static async Task InsertAtEndOfFile(StorageRecord record)
+    {
+        await using var file = File.Open(Storage.BackingFilePath(), FileMode.OpenOrCreate);
+        file.Seek(0, SeekOrigin.End);
+        await file.WriteAsync(BitConverter.GetBytes(record.Timestamp).AsMemory(0, 8));
+        await file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 4));
+        await file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 4));
+        await file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 4));
+    }
 }
 
 
