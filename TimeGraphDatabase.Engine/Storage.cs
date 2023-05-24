@@ -35,6 +35,65 @@ public class Storage : IDisposable
         var idealNumberOfFillers = numberOfFillers / FillFactor;
         var numberMissing = idealNumberOfFillers - numberOfFillers;
 
+        if (numberMissing>0)
+            await DefragFromEndOfFile(numberMissing);
+        else
+            await DefragFromStartOfFile();
+    }
+
+    private async Task DefragFromStartOfFile()
+    {
+        
+        var nextRead = 0;
+        var nextWrite = 0;
+
+        while (nextWrite < _numberOfRows)
+        {
+            if (nextRead > _numberOfRows) nextRead = _numberOfRows;
+
+            // Advance nextRead until we find a value which isn't a filler.
+            ReadRowIntoBuffer(nextRead);
+            while (nextRead < _numberOfRows && BufferContainsFiller())
+            {
+                nextRead++;
+                ReadRowIntoBuffer(nextRead);
+            }
+
+            ReadRowIntoBuffer(nextWrite);
+            var currentWriteIsFiller = BufferContainsFiller();
+            var currentWriteShouldBeAFiller = nextWrite % (FillFactor + 1) == FillFactor;
+
+            if (currentWriteIsFiller && currentWriteShouldBeAFiller)
+            {
+                // All good
+                nextWrite++;
+            }
+            else if (!currentWriteShouldBeAFiller)
+            {
+                // Write contents of nextRead to nextWrite
+                ReadRowIntoBuffer(nextRead);
+                _file.Seek(nextWrite * BytesPerRow, SeekOrigin.Begin);
+                await _file.WriteAsync(_buffer);
+                
+                _file.Seek(nextRead * BytesPerRow, SeekOrigin.Begin);
+                await WriteFillerAtCurrentLocation();
+
+                nextRead++;
+                nextWrite++;
+            }
+            else if (!currentWriteIsFiller && currentWriteShouldBeAFiller)
+            {
+                // Write filler to nextWrite
+                _file.Seek(nextWrite * BytesPerRow, SeekOrigin.Begin);
+                await WriteFillerAtCurrentLocation();
+                nextWrite++;
+            }
+        }
+        
+    }
+
+    private async Task DefragFromEndOfFile(int numberMissing)
+    {
         // Add the missing fillers to the end of our file.
         while (numberMissing > 0)
         {
@@ -52,12 +111,13 @@ public class Storage : IDisposable
             while (nextWrite >= 0)
             {
                 if (nextRead < 0) nextRead = 0;
-                
+
                 // Advance nextRead until we find a value which isn't a filler.
                 ReadRowIntoBuffer(nextRead);
                 while (nextRead > 0 && BufferContainsFiller())
                 {
                     nextRead--;
+                    ReadRowIntoBuffer(nextRead);
                 }
 
                 ReadRowIntoBuffer(nextWrite);
@@ -89,7 +149,7 @@ public class Storage : IDisposable
             }
         }
     }
-    
+
     public async ValueTask InsertRowAsync(StorageRecord record)
     {
         // Work out the location to insert our row.  We do a binary search until we

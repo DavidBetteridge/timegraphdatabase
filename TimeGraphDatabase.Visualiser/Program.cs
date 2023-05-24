@@ -2,7 +2,7 @@
 using TimeGraphDatabase.Engine;
 
 File.Delete(Storage.BackingFilePath());
-using (var storage = new Storage { FillFactor = 1000 })
+using (var storage = new Storage { FillFactor = 2 })
 {
     for (uint i = 0; i < 100; i++)
     {
