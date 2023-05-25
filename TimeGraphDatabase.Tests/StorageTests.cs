@@ -147,19 +147,19 @@ public class StorageTests
     [InlineData(new uint[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 11, new uint[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 })]
     public async Task DeletingARowReplacesItWithAFiller(uint[] initialRows, uint rowToDelete, uint[] expectedRows)
     {
+        foreach (var initialRow in initialRows)
+        {
+            await InsertAtEndOfFile(new StorageRecord
+            {
+                Timestamp = initialRow,
+                LhsId = initialRow,
+                RhsId = initialRow,
+                RelationshipId = initialRow
+            });
+        }
+
         using (var storage = new Storage { FillFactor = 10 })
         {
-            foreach (var initialRow in initialRows)
-            {
-                await storage.InsertRowAsync(new StorageRecord
-                {
-                    Timestamp = initialRow,
-                    LhsId = initialRow,
-                    RhsId = initialRow,
-                    RelationshipId = initialRow
-                });
-            }
-
             await storage.DeleteRowAsync(new StorageRecord
             {
                 Timestamp = rowToDelete,
@@ -203,7 +203,7 @@ public class StorageTests
             RhsId = 1,
             RelationshipId = 1
         });
-        
+
         await InsertAtEndOfFile(new StorageRecord
         {
             Timestamp = 0,
@@ -211,7 +211,7 @@ public class StorageTests
             RhsId = 0,
             RelationshipId = 0
         });
-        
+
         await InsertAtEndOfFile(new StorageRecord
         {
             Timestamp = 3,
@@ -219,7 +219,7 @@ public class StorageTests
             RhsId = 3,
             RelationshipId = 3
         });
-        
+
         // When a row at time 2 is inserted
         using (var storage = new Storage { FillFactor = 10 })
         {
