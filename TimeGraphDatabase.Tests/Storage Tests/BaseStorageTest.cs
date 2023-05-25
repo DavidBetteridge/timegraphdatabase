@@ -18,10 +18,18 @@ public abstract class BaseStorageTest
             .Concat(BitConverter.GetBytes(i2))
             .Concat(BitConverter.GetBytes(i3));
     }
+    
+    protected static IEnumerable<byte> IsRow(uint i)
+    {
+        return BitConverter.GetBytes((ulong)i)
+            .Concat(BitConverter.GetBytes(i))
+            .Concat(BitConverter.GetBytes(i))
+            .Concat(BitConverter.GetBytes(i));
+    }
 
     protected static IEnumerable<byte> IsFiller() => IsRow(0, 0, 0, 0);
 
-    protected static async Task InsertAtEndOfFile(StorageRecord record)
+    protected static async Task InsertAtEndOfTestFile(StorageRecord record)
     {
         await using var file = File.Open(Storage.BackingFilePath(), FileMode.OpenOrCreate);
         file.Seek(0, SeekOrigin.End);
@@ -29,5 +37,16 @@ public abstract class BaseStorageTest
         await file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 4));
         await file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 4));
         await file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 4));
+    }
+    
+    protected static Task InsertAtEndOfTestFile(uint value)
+    {
+        return InsertAtEndOfTestFile(new StorageRecord
+        {
+            Timestamp = value,
+            LhsId = value,
+            RhsId = value,
+            RelationshipId = value,
+        });
     }
 }

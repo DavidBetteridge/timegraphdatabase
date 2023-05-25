@@ -23,7 +23,7 @@ public class DeleteTests : BaseStorageTest
     {
         foreach (var initialRow in initialRows)
         {
-            await InsertAtEndOfFile(new StorageRecord
+            await InsertAtEndOfTestFile(new StorageRecord
             {
                 Timestamp = initialRow,
                 LhsId = initialRow,

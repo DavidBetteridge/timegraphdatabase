@@ -37,10 +37,10 @@ public class InsertTests : BaseStorageTest
         // Given a file already exists which contains all 1s for the first row.
         var dummyRow = new byte[]
         {
-            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-            0xFF, 0xFF, 0xFF, 0xFF,
-            0xFF, 0xFF, 0xFF, 0xFF,
-            0xFF, 0xFF, 0xFF, 0xFF,
+            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+            0x01, 0x01, 0x01, 0x01,
+            0x01, 0x01, 0x01, 0x01,
+            0x01, 0x01, 0x01, 0x01,
         };
         await File.WriteAllBytesAsync(Storage.BackingFilePath(), dummyRow);
 
@@ -129,29 +129,9 @@ public class InsertTests : BaseStorageTest
     public async Task RowsCanBeInsertedAtAFillerLocation()
     {
         // Given a file containing three rows:  1, FILLER, 3
-        await InsertAtEndOfFile(new StorageRecord
-        {
-            Timestamp = 1,
-            LhsId = 1,
-            RhsId = 1,
-            RelationshipId = 1
-        });
-
-        await InsertAtEndOfFile(new StorageRecord
-        {
-            Timestamp = 0,
-            LhsId = 0,
-            RhsId = 0,
-            RelationshipId = 0
-        });
-
-        await InsertAtEndOfFile(new StorageRecord
-        {
-            Timestamp = 3,
-            LhsId = 3,
-            RhsId = 3,
-            RelationshipId = 3
-        });
+        await InsertAtEndOfTestFile(1);
+        await InsertAtEndOfTestFile(0);
+        await InsertAtEndOfTestFile(3);
 
         // When a row at time 2 is inserted
         using (var storage = new Storage { FillFactor = 10 })
@@ -168,10 +148,54 @@ public class InsertTests : BaseStorageTest
         // Then the file contains 1, 2, 3
         var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
         var expected =
-            IsRow(1, 1, 1, 1)
-                .Concat(IsRow(2, 2, 2, 2))
-                .Concat(IsRow(3, 3, 3, 3));
+            IsRow(1)
+                .Concat(IsRow(2))
+                .Concat(IsRow(3));
         actual.Should().BeEquivalentTo(expected);
     }
 
+    
+    [Fact]
+    public async Task RowWillBeInsertedAndUsePreviousFiller()
+    {
+        // Given a file containing these rows:  1, 2, 3, 4, 5, FILLER, 7, 9, 10
+        await InsertAtEndOfTestFile(1);
+        await InsertAtEndOfTestFile(2);
+        await InsertAtEndOfTestFile(3);
+        await InsertAtEndOfTestFile(4);
+        await InsertAtEndOfTestFile(5);
+        await InsertAtEndOfTestFile(0); //Filler
+        await InsertAtEndOfTestFile(7);
+        await InsertAtEndOfTestFile(9);
+        await InsertAtEndOfTestFile(10);
+
+        // When row 8 is inserted
+        using (var storage = new Storage { FillFactor = 10 })
+        {
+            await storage.InsertRowAsync(new StorageRecord
+            {
+                Timestamp = 8,
+                LhsId = 8,
+                RhsId = 8,
+                RelationshipId = 8
+            });
+        }
+
+        // Then the file contains 1, 2, 3, 4, 5, 7, 8, 9, 10
+        var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
+        var expected =
+                        IsRow(1)
+                .Concat(IsRow(2))
+                .Concat(IsRow(3))
+                .Concat(IsRow(4))
+                .Concat(IsRow(5))
+                .Concat(IsRow(7))
+                .Concat(IsRow(8))
+                .Concat(IsRow(9))
+                .Concat(IsRow(10))
+            ;
+        actual.Should().BeEquivalentTo(expected);
+    }
+
+    
 }

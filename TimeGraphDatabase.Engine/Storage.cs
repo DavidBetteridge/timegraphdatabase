@@ -6,7 +6,7 @@ public class Storage : IDisposable
 {
     private readonly FileStream _file;
     private int _numberOfRows;
-    public static int BytesPerRow = 8 + 4 + 4 + 4;
+    public static readonly int BytesPerRow = 8 + 4 + 4 + 4;
     public int FillFactor { get; init; } = 10;
     private readonly byte[] _buffer = new byte[BytesPerRow];
     public Storage()
@@ -181,7 +181,7 @@ public class Storage : IDisposable
             return;
         }
         
-        if (_buffer.Compare(toInsert) < 0)
+        if (_buffer.LessThan(toInsert))
         {
             // The last value in the file comes before ours.
             if (lastNoneFillerRowNumber == _numberOfRows - 1)
@@ -203,90 +203,59 @@ public class Storage : IDisposable
         // Now we have to insert the value mid-file.  Find the location
         // using a binary search,  allowing for fillers.
 
-
+        // We know there exists a value in the file which is bigger than I. Now we need to 
+        // find 'm' such that X[m-1] < I and X[m] >= I.
         
-        // To insert   A
-        
-        //  x[n] < A and x[n+1] > A  (ignoring fillers)
-        //  Find closest filler to n
-        
-        // Are fillers more dense to the left or right
-        // and then bubble in that direction.
-        
-        // Use a binary search to find the gap to insert the new row into.
         var L = 0;
         var R = _numberOfRows - 1;
         var solutionFound = false;
-        while (L != R && !solutionFound)
+        while (L < R && !solutionFound)
         {
+            solutionFound = true;  // We need to prove this isn't the correct location.
             var m = (int)Math.Ceiling((L + R) / 2.0);
+        
+            // Find the first value to the right which isn't a filler.
+            var mUpper = m;
+            ReadRowIntoBuffer(mUpper);
+            while (BufferContainsFiller() && mUpper < R)
+            {
+                mUpper++;
+                ReadRowIntoBuffer(mUpper);
+            }
 
-            // while (BufferContainsFiller() && m < R)
-            // {
-            //     m++;
-            //     ReadRowIntoBuffer(m);
-            // }
-            //
-            // if (BufferContainsFiller())
-            // {
-            //     m = (int)Math.Ceiling((L + R) / 2.0);
-            //     while (BufferContainsFiller() && m > L)
-            //     {
-            //         m--;
-            //         ReadRowIntoBuffer(m);
-            //     }
-            // }
-
-            // if (BufferContainsFiller())
-            //     return false;
-
-            // Simple case.
-            // X[m-1] <= toInsert and X[m+1] > to_insert and x[m] is a filler
-            // If X[m-1] > toInsert then R = m-1
-            // If X[m+1] < toInsert then L = m
-
-            solutionFound = true;
-            ReadRowIntoBuffer(m - 1);
-            if (_buffer.Compare(toInsert) > 0)
+            if (_buffer.GreaterThan(toInsert))
             {
                 // Our guess is too large.
                 R = m - 1;
                 solutionFound = false;
             }
-
-            ReadRowIntoBuffer(m + 1);
-            if (_buffer.Compare(toInsert) < 0)
+            
+            // Find the first value to the left which isn't a filler.
+            var mLower = m-1;
+            ReadRowIntoBuffer(mLower);
+            while (BufferContainsFiller() && mLower > L)
             {
-                // Our guess is too small.
+                mLower--;
+                ReadRowIntoBuffer(mLower);
+            }
+
+            if (_buffer.GreaterThanOrEqual(toInsert))
+            {
+                // Our guess is too large.
                 L = m;
                 solutionFound = false;
             }
             
             if (solutionFound)
             {
+                // Shuffle the closest filler into location 'm'
+                
                 // Insert the row at location m
                 await OverwriteRow(record, m);
                 return;
             }
         }
 
-
-        // Work out the location to insert our row.  We do a binary search until we
-        // a.  Find that we are the earliest entry in the file X < A[0]
-        // b.  Find that we are the last entry in the file  X > A[n]
-        // c.  Find the location in the file with  A[n] < X < A[n+1] (fillers can exist between A[n] and A[n+1])
-        // d.  We already exist in the file.  ie.  A[n] == X
-        
-        // For cases a and c,  we then shuffle the closest filler into the desired location. 
-        // Replace the filler with our new row.
-        // For b,  we add to the end of the file,  with a filler as required.
-        // For d,  we exit
-        _file.Seek(0, SeekOrigin.End);
-        await _file.WriteAsync(BitConverter.GetBytes(record.Timestamp).AsMemory(0, 8));
-        await _file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 4));
-        await _file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 4));
-        await _file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 4));
-        _numberOfRows++;
     }
 
     private async Task OverwriteRow(StorageRecord record, int m)
@@ -435,12 +404,18 @@ public class Storage : IDisposable
 
 static class ArrayExtensions {
     public static int Compare(this byte[] b1, byte[] b2) {
-        if (b1 == null && b2 == null)
-            return 0;
-        else if (b1 == null)
-            return -1;
-        else if (b2 == null)
-            return 1;
         return ((IStructuralComparable) b1).CompareTo(b2, Comparer<byte>.Default);
+    }
+    public static bool LessThan(this byte[] b1, byte[] b2) {
+        return ((IStructuralComparable) b1).CompareTo(b2, Comparer<byte>.Default) < 0;
+    }
+    public static bool LessThanOrEqual(this byte[] b1, byte[] b2) {
+        return ((IStructuralComparable) b1).CompareTo(b2, Comparer<byte>.Default) <= 0;
+    }
+    public static bool GreaterThan(this byte[] b1, byte[] b2) {
+        return ((IStructuralComparable) b1).CompareTo(b2, Comparer<byte>.Default) > 0;
+    }
+    public static bool GreaterThanOrEqual(this byte[] b1, byte[] b2) {
+        return ((IStructuralComparable) b1).CompareTo(b2, Comparer<byte>.Default) >= 0;
     }
 }

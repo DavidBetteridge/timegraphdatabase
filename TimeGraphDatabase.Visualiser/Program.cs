@@ -1,27 +1,27 @@
 ﻿using Spectre.Console;
 using TimeGraphDatabase.Engine;
 
-File.Delete(Storage.BackingFilePath());
-using (var storage = new Storage { FillFactor = 2 })
-{
-    for (uint i = 0; i < 100; i++)
-    {
-        await storage.InsertRowAsync(new StorageRecord
-        {
-            Timestamp = (ulong) new DateTimeOffset(2023,1,1,0,0,0, TimeSpan.Zero).AddDays(i).ToUnixTimeMilliseconds(),
-            LhsId = i,
-            RhsId = i,
-            RelationshipId = i
-        });  
-    }
-}
-
-using (var storage = new Storage { FillFactor = 10 })
-{ 
-    await storage.DefragAsync();
-}
-
-var fileContents = await File.ReadAllBytesAsync(Storage.BackingFilePath());
+// File.Delete(Storage.BackingFilePath());
+// using (var storage = new Storage { FillFactor = 2 })
+// {
+//     for (uint i = 0; i < 100; i++)
+//     {
+//         await storage.InsertRowAsync(new StorageRecord
+//         {
+//             Timestamp = (ulong) new DateTimeOffset(2023,1,1,0,0,0, TimeSpan.Zero).AddDays(i).ToUnixTimeMilliseconds(),
+//             LhsId = i,
+//             RhsId = i,
+//             RelationshipId = i
+//         });  
+//     }
+// }
+//
+// using (var storage = new Storage { FillFactor = 10 })
+// { 
+//     await storage.DefragAsync();
+// }
+// var fileContents = await File.ReadAllBytesAsync(Storage.BackingFilePath());
+var fileContents = await File.ReadAllBytesAsync("/Users/davidbetteridge/Personal/TimeGraphDatabase/TimeGraphDatabase.Tests/bin/Debug/net7.0/database.graph");
 var numberOfRows = fileContents.Length / Storage.BytesPerRow;
 
 var table = new Table();
