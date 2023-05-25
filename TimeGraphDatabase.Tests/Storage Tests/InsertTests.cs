@@ -3,15 +3,9 @@ using TimeGraphDatabase.Engine;
 
 namespace TimeGraphDatabase.Tests;
 
-public class StorageTests
+public class InsertTests : BaseStorageTest
 {
-    public StorageTests()
-    {
-        // Given no file currently exists
-        File.Delete(Storage.BackingFilePath());
-    }
-
-    [Fact]
+        [Fact]
     public async Task TheFirstRelationshipIsWrittenToTheFile()
     {
         var record = new StorageRecord
@@ -130,68 +124,7 @@ public class StorageTests
                 .Concat(IsRow(12, 12, 12, 12));
         actual.Should().BeEquivalentTo(expected);
     }
-
-    [Theory]
-    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 1, new uint[] { 0, 2, 3, 4, 5, 6, 7, 8, 9, 10 })]
-    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 2, new uint[] { 1, 0, 3, 4, 5, 6, 7, 8, 9, 10 })]
-    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 3, new uint[] { 1, 2, 0, 4, 5, 6, 7, 8, 9, 10 })]
-    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 4, new uint[] { 1, 2, 3, 0, 5, 6, 7, 8, 9, 10 })]
-    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 5, new uint[] { 1, 2, 3, 4, 0, 6, 7, 8, 9, 10 })]
-    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 6, new uint[] { 1, 2, 3, 4, 5, 0, 7, 8, 9, 10 })]
-    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 7, new uint[] { 1, 2, 3, 4, 5, 6, 0, 8, 9, 10 })]
-    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 8, new uint[] { 1, 2, 3, 4, 5, 6, 7, 0, 9, 10 })]
-    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 9, new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 0, 10 })]
-    [InlineData(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 10, new uint[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 })]
-    [InlineData(new uint[] { 1, 2, 3, 4, 0, 6, 7, 8, 9, 10 }, 10, new uint[] { 1, 2, 3, 4, 0, 6, 7, 8, 9, 0 })]
-    [InlineData(new uint[] { 1, 2, 3, 4, 0, 6, 7, 8, 9, 10 }, 11, new uint[] { 1, 2, 3, 4, 0, 6, 7, 8, 9, 10 })]
-    [InlineData(new uint[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, 11, new uint[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 })]
-    public async Task DeletingARowReplacesItWithAFiller(uint[] initialRows, uint rowToDelete, uint[] expectedRows)
-    {
-        foreach (var initialRow in initialRows)
-        {
-            await InsertAtEndOfFile(new StorageRecord
-            {
-                Timestamp = initialRow,
-                LhsId = initialRow,
-                RhsId = initialRow,
-                RelationshipId = initialRow
-            });
-        }
-
-        using (var storage = new Storage { FillFactor = 10 })
-        {
-            await storage.DeleteRowAsync(new StorageRecord
-            {
-                Timestamp = rowToDelete,
-                LhsId = rowToDelete,
-                RhsId = rowToDelete,
-                RelationshipId = rowToDelete
-            });
-        }
-
-        var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
-
-        var expected = IsRow(expectedRows[0], expectedRows[0], expectedRows[0], expectedRows[0]);
-        for (var i = 1; i < expectedRows.Length; i++)
-        {
-            expected = expected.Concat(
-                IsRow(expectedRows[i], expectedRows[i], expectedRows[i], expectedRows[i])
-            );
-        }
-
-        actual.Should().BeEquivalentTo(expected);
-    }
-
-    private static IEnumerable<byte> IsRow(ulong i, uint i1, uint i2, uint i3)
-    {
-        return BitConverter.GetBytes(i)
-            .Concat(BitConverter.GetBytes(i1))
-            .Concat(BitConverter.GetBytes(i2))
-            .Concat(BitConverter.GetBytes(i3));
-    }
-
-    private static IEnumerable<byte> IsFiller() => IsRow(0, 0, 0, 0);
-
+    
     [Fact]
     public async Task RowsCanBeInsertedAtAFillerLocation()
     {
@@ -241,32 +174,4 @@ public class StorageTests
         actual.Should().BeEquivalentTo(expected);
     }
 
-    private static async Task InsertAtEndOfFile(StorageRecord record)
-    {
-        await using var file = File.Open(Storage.BackingFilePath(), FileMode.OpenOrCreate);
-        file.Seek(0, SeekOrigin.End);
-        await file.WriteAsync(BitConverter.GetBytes(record.Timestamp).AsMemory(0, 8));
-        await file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 4));
-        await file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 4));
-        await file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 4));
-    }
 }
-
-
-/*
- * INSERT TESTS
- * Rows can be appended    ✅  
- * Fillers are inserted at the end of the file  ✅
- * Row can be inserted if lines up with a filler
- * Row can be inserted by moving rows forward/backwards to the next filler
- * Rows can be split into multiple file with they become full.
- *
- * DELETE TESTS  
- * When rows are deleted they are replaced by a filler  ✅
- *
- *
- * QUERY TESTS
- * All entries in a single file < X
- * All entries from split files < X
- * Entries with predicate ( lhs, rhs, relation => bool )
- */
