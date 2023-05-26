@@ -250,6 +250,31 @@ public class Storage : IDisposable
             {
                 // Shuffle the closest filler into location 'm'
                 
+                // Find the first filler after 'm'
+                mUpper = m;
+                ReadRowIntoBuffer(mUpper);
+                while (!BufferContainsFiller() && mUpper < (_numberOfRows - 1))
+                {
+                    mUpper++;
+                    ReadRowIntoBuffer(mUpper);
+                }
+
+                if (!BufferContainsFiller() && mUpper == (_numberOfRows - 1))
+                {
+                    // We have reached the end of the file without finding a buffer.  So we append on to the end.
+                    WriteFillerAtCurrentLocation();
+                    mUpper++;
+                }
+                
+                // We know have a filler at location mUpper,  which we need to shuffle back to location 'm'
+                while (mUpper > m)
+                {
+                    ReadRowIntoBuffer(mUpper);
+                    _file.Seek((mUpper - 1) * BytesPerRow, SeekOrigin.Begin);
+                    await _file.WriteAsync(_buffer);
+                    mUpper--;
+                }
+                
                 // Insert the row at location m
                 await OverwriteRow(record, m);
                 return;
