@@ -156,32 +156,32 @@ public class InsertTests : BaseStorageTest
 
     
     [Fact]
-    public async Task RowWillBeInsertedAndUsePreviousFiller()
+    public async Task RowWillBeInsertedAndUseNextFiller()
     {
-        // Given a file containing these rows:  1, 2, 3, 4, 5, FILLER, 7, 9, 10
+        // Given a file containing these rows:  1, 2, 3, 4, 5, 6, 8, FILLER, 10
         await InsertAtEndOfTestFile(1);
         await InsertAtEndOfTestFile(2);
         await InsertAtEndOfTestFile(3);
         await InsertAtEndOfTestFile(4);
         await InsertAtEndOfTestFile(5);
-        await InsertAtEndOfTestFile(0); //Filler
-        await InsertAtEndOfTestFile(7);
-        await InsertAtEndOfTestFile(9);
+        await InsertAtEndOfTestFile(6); 
+        await InsertAtEndOfTestFile(8);
+        await InsertAtEndOfTestFile(0);  //FILLER
         await InsertAtEndOfTestFile(10);
 
-        // When row 8 is inserted
+        // When row 7 is inserted
         using (var storage = new Storage { FillFactor = 10 })
         {
             await storage.InsertRowAsync(new StorageRecord
             {
-                Timestamp = 8,
-                LhsId = 8,
-                RhsId = 8,
-                RelationshipId = 8
+                Timestamp = 7,
+                LhsId = 7,
+                RhsId = 7,
+                RelationshipId = 7
             });
         }
 
-        // Then the file contains 1, 2, 3, 4, 5, 7, 8, 9, 10
+        // Then the file contains 1, 2, 3, 4, 5, 6, 7, 8, 10
         var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
         var expected =
                         IsRow(1)
@@ -189,13 +189,13 @@ public class InsertTests : BaseStorageTest
                 .Concat(IsRow(3))
                 .Concat(IsRow(4))
                 .Concat(IsRow(5))
+                .Concat(IsRow(6))
                 .Concat(IsRow(7))
                 .Concat(IsRow(8))
-                .Concat(IsRow(9))
                 .Concat(IsRow(10))
             ;
         actual.Should().BeEquivalentTo(expected);
     }
 
-    
+    // TEST:  Insert at start of file
 }

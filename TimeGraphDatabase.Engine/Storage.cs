@@ -223,10 +223,10 @@ public class Storage : IDisposable
                 ReadRowIntoBuffer(mUpper);
             }
 
-            if (_buffer.GreaterThan(toInsert))
+            if (_buffer.LessThan(toInsert))
             {
-                // Our guess is too large.
-                R = m - 1;
+                // Our guess is too small.
+                L = m;
                 solutionFound = false;
             }
             
@@ -242,7 +242,7 @@ public class Storage : IDisposable
             if (_buffer.GreaterThanOrEqual(toInsert))
             {
                 // Our guess is too large.
-                L = m;
+                R = m - 1;
                 solutionFound = false;
             }
             
@@ -269,8 +269,8 @@ public class Storage : IDisposable
                 // We know have a filler at location mUpper,  which we need to shuffle back to location 'm'
                 while (mUpper > m)
                 {
-                    ReadRowIntoBuffer(mUpper);
-                    _file.Seek((mUpper - 1) * BytesPerRow, SeekOrigin.Begin);
+                    ReadRowIntoBuffer(mUpper-1);
+                    _file.Seek((mUpper) * BytesPerRow, SeekOrigin.Begin);
                     await _file.WriteAsync(_buffer);
                     mUpper--;
                 }
