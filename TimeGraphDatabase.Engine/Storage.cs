@@ -161,7 +161,7 @@ public class Storage : IDisposable
             await InsertRecordAtEndOfFile(record);
             return;
         }
-        
+       
         //////////////////////////////////////////////////////////////
         // Preferred case, inserting a row at the end of the file.
         
@@ -198,6 +198,14 @@ public class Storage : IDisposable
             }
         }
         
+        //////////////////////////////////////////////////////////////
+        // Smallest value - row needs to be inserted at the start of the file.
+        ReadRowIntoBuffer(0);
+        if (_buffer.GreaterThan(toInsert))
+        {
+            await InsertRecordBefore(0, record);
+            return;
+        }
         
         //////////////////////////////////////////////////////////////
         // Now we have to insert the value mid-file.  Find the location
@@ -249,38 +257,46 @@ public class Storage : IDisposable
             if (solutionFound)
             {
                 // Shuffle the closest filler into location 'm'
-                
-                // Find the first filler after 'm'
-                mUpper = m;
-                ReadRowIntoBuffer(mUpper);
-                while (!BufferContainsFiller() && mUpper < (_numberOfRows - 1))
-                {
-                    mUpper++;
-                    ReadRowIntoBuffer(mUpper);
-                }
-
-                if (!BufferContainsFiller() && mUpper == (_numberOfRows - 1))
-                {
-                    // We have reached the end of the file without finding a buffer.  So we append on to the end.
-                    WriteFillerAtCurrentLocation();
-                    mUpper++;
-                }
-                
-                // We know have a filler at location mUpper,  which we need to shuffle back to location 'm'
-                while (mUpper > m)
-                {
-                    ReadRowIntoBuffer(mUpper-1);
-                    _file.Seek((mUpper) * BytesPerRow, SeekOrigin.Begin);
-                    await _file.WriteAsync(_buffer);
-                    mUpper--;
-                }
-                
-                // Insert the row at location m
-                await OverwriteRow(record, m);
+                await InsertRecordBefore(m, record);
                 return;
             }
         }
 
+        if (!solutionFound)
+        {
+            throw new Exception("Failed to find insert location!");
+        }
+    }
+
+    private async Task InsertRecordBefore(int rowNumber, StorageRecord record)
+    {
+        // Find the first filler after 'rowNumber'
+        var mUpper = rowNumber;
+        ReadRowIntoBuffer(mUpper);
+        while (!BufferContainsFiller() && mUpper < (_numberOfRows - 1))
+        {
+            mUpper++;
+            ReadRowIntoBuffer(mUpper);
+        }
+
+        if (!BufferContainsFiller() && mUpper == (_numberOfRows - 1))
+        {
+            // We have reached the end of the file without finding a buffer.  So we append on to the end.
+            WriteFillerAtCurrentLocation();
+            mUpper++;
+        }
+                
+        // We know have a filler at location mUpper,  which we need to shuffle back to location 'rowNumber'
+        while (mUpper > rowNumber)
+        {
+            ReadRowIntoBuffer(mUpper-1);
+            _file.Seek((mUpper) * BytesPerRow, SeekOrigin.Begin);
+            await _file.WriteAsync(_buffer);
+            mUpper--;
+        }
+                
+        // Insert the row at location rowNumber
+        await OverwriteRow(record, rowNumber);
     }
 
     private async Task OverwriteRow(StorageRecord record, int m)
