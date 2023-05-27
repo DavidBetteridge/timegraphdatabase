@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using FluentAssertions;
 using TimeGraphDatabase.Engine;
 
@@ -26,7 +27,7 @@ public class InsertTests : BaseStorageTest
         // Entries are in the format:  Timestamp LhsId RhsId RelationshipId
         // ie.  each entry is 4 longs (4x8 bytes)
         var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
-        var expected = BitConverter.GetBytes(10000L)
+        var expected = BitConverter.GetBytes( BinaryPrimitives.ReverseEndianness(10000L))
             .Concat(BitConverter.GetBytes(10001))
             .Concat(BitConverter.GetBytes(10002))
             .Concat(BitConverter.GetBytes(10003));
@@ -36,44 +37,23 @@ public class InsertTests : BaseStorageTest
     [Fact]
     public async Task TheMostRecentRelationshipIsAddedToTheEndOfTheFile()
     {
-        // Given a file already exists which contains all 1s for the first row.
-        var dummyRow = new byte[]
-        {
-            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-            0x01, 0x01, 0x01, 0x01,
-            0x01, 0x01, 0x01, 0x01,
-            0x01, 0x01, 0x01, 0x01,
-        };
-        await File.WriteAllBytesAsync(Storage.BackingFilePath(), dummyRow);
+        await GivenAFileContaining(1);
 
-        var record = new StorageRecord
-        {
-            Timestamp = 10000L,
-            LhsId = 10001,
-            RhsId = 10002,
-            RelationshipId = 10003
-        };
-
-        using (var storage = new Storage())
-        {
-            await storage.InsertRowAsync(record);
-        }
-
-        // Entries are in the format:  Timestamp LhsId RhsId RelationshipId
-        // ie.  each entry is 4 longs (4x8 bytes)
-        var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
-        var expected =
-            // Dummy first row
-            dummyRow
-
-                // New row
-                .Concat(BitConverter.GetBytes(10000L))
-                .Concat(BitConverter.GetBytes(10001))
-                .Concat(BitConverter.GetBytes(10002))
-                .Concat(BitConverter.GetBytes(10003));
-        actual.Should().BeEquivalentTo(expected);
+        await WhenTheRecordIsInserted(10000);
+        
+        await ThenTheFileMustContain(1, 10000);
     }
 
+    [Fact]
+    public async Task SimpleTest()
+    {
+        await GivenAFileContaining(1, 2, 3);
+
+        await WhenTheRecordIsInserted(4);
+
+        await ThenTheFileMustContain(1, 2, 3, 4);
+    }
+    
     [Fact]
     public async Task BlocksOfTenRowsAreBrokenUpByFillerRows()
     {
@@ -147,16 +127,18 @@ public class InsertTests : BaseStorageTest
     private static async Task WhenTheRecordIsInserted(uint value)
     {
         using var storage = new Storage { FillFactor = 10 };
+        var timestamp = (value==FILLER) ? 0 : (ulong)new DateTimeOffset(2023, 1, 1, 0, 0, 0, TimeSpan.Zero).AddDays(value)
+            .ToUnixTimeMilliseconds();
         await storage.InsertRowAsync(new StorageRecord
         {
-            Timestamp = value,
+            Timestamp = timestamp,
             LhsId = value,
             RhsId = value,
             RelationshipId = value
         });
     }
 
-    private static async Task ThenTheFileMustContain(params uint[] rows)
+    private static async Task ThenTheFileMustContain(params ulong[] rows)
     {
         var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
         var expected = IsRow(rows[0]);

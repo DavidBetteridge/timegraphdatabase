@@ -1,27 +1,43 @@
-﻿using Spectre.Console;
+﻿using System.Buffers.Binary;
+using System.Diagnostics;
+using Spectre.Console;
 using TimeGraphDatabase.Engine;
 
-// File.Delete(Storage.BackingFilePath());
-// using (var storage = new Storage { FillFactor = 2 })
-// {
-//     for (uint i = 0; i < 100; i++)
-//     {
-//         await storage.InsertRowAsync(new StorageRecord
-//         {
-//             Timestamp = (ulong) new DateTimeOffset(2023,1,1,0,0,0, TimeSpan.Zero).AddDays(i).ToUnixTimeMilliseconds(),
-//             LhsId = i,
-//             RhsId = i,
-//             RelationshipId = i
-//         });  
-//     }
-// }
+
+
+var sw = new Stopwatch();
+sw.Start();
+
+
+const int NumberOfRows = 250000;
+File.Delete(Storage.BackingFilePath());
+using (var storage = new Storage { FillFactor = 10 })
+{
+    for (uint i = 1; i <= NumberOfRows; i++)
+    {
+        await storage.InsertRowAsync(new StorageRecord
+        {
+            Timestamp = (ulong) new DateTimeOffset(2023,1,1,0,0,0, TimeSpan.Zero).AddDays(i).ToUnixTimeMilliseconds(),
+            LhsId = i,
+            RhsId = i,
+            RelationshipId = i
+        });  
+    }
+}
+
+sw.Stop();
+
+Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to insert {NumberOfRows} rows.");
+
+return;
+
 //
 // using (var storage = new Storage { FillFactor = 10 })
 // { 
 //     await storage.DefragAsync();
 // }
-// var fileContents = await File.ReadAllBytesAsync(Storage.BackingFilePath());
-var fileContents = await File.ReadAllBytesAsync("/Users/davidbetteridge/Personal/TimeGraphDatabase/TimeGraphDatabase.Tests/bin/Debug/net7.0/database.graph");
+var fileContents = await File.ReadAllBytesAsync(Storage.BackingFilePath());
+//var fileContents = await File.ReadAllBytesAsync("/Users/davidbetteridge/Personal/TimeGraphDatabase/TimeGraphDatabase.Tests/bin/Debug/net7.0/database.graph");
 var numberOfRows = fileContents.Length / Storage.BytesPerRow;
 
 var table = new Table();
@@ -36,7 +52,7 @@ for (var rowNumber = 1; rowNumber <= numberOfRows; rowNumber++)
 {
     var row = fileContents[((rowNumber - 1) * Storage.BytesPerRow)..(rowNumber * Storage.BytesPerRow)];
 
-    var timestamp = BitConverter.ToUInt64(row.AsSpan()[..8]);
+    var timestamp = BinaryPrimitives.ReverseEndianness(BitConverter.ToUInt64(row.AsSpan()[..8]));
     var when = DateTimeOffset.FromUnixTimeMilliseconds((long)timestamp);
     
     var lhs = BitConverter.ToUInt32(row.AsSpan()[8..12]);

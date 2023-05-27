@@ -177,7 +177,7 @@ public class Storage : IDisposable
         if (lastNoneFillerRowNumber == -1)
         {
             // The file only contains fillers.  So we can write our record anywhere.
-            OverwriteRow(record, 0);
+            await OverwriteRow(record, 0);
             return;
         }
         
@@ -193,7 +193,7 @@ public class Storage : IDisposable
             else
             {
                 // Replace the first filler after the final populated row with our row.
-                OverwriteRow(record, lastNoneFillerRowNumber+1);
+                await OverwriteRow(record, lastNoneFillerRowNumber+1);
                 return;
             }
         }
@@ -206,6 +206,8 @@ public class Storage : IDisposable
             await InsertRecordBefore(0, record);
             return;
         }
+
+     //   throw new Exception("Search nneeded" + record.LhsId);
         
         //////////////////////////////////////////////////////////////
         // Now we have to insert the value mid-file.  Find the location
@@ -282,7 +284,7 @@ public class Storage : IDisposable
         if (!BufferContainsFiller() && mUpper == (_numberOfRows - 1))
         {
             // We have reached the end of the file without finding a buffer.  So we append on to the end.
-            WriteFillerAtCurrentLocation();
+            await WriteFillerAtCurrentLocation();
             mUpper++;
         }
                 
@@ -302,10 +304,7 @@ public class Storage : IDisposable
     private async Task OverwriteRow(StorageRecord record, int m)
     {
         _file.Seek(m * BytesPerRow, SeekOrigin.Begin);
-        await _file.WriteAsync(BitConverter.GetBytes(record.Timestamp).AsMemory(0, 8));
-        await _file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 4));
-        await _file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 4));
-        await _file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 4));
+        await _file.WriteAsync(record.ToByteArray());
     }
 
     private async Task InsertRecordAtEndOfFile(StorageRecord record)
@@ -341,10 +340,7 @@ public class Storage : IDisposable
         
         // Now we can insert our actual record
         _file.Seek(0, SeekOrigin.End);
-        await _file.WriteAsync(BitConverter.GetBytes(record.Timestamp).AsMemory(0, 8));
-        await _file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 4));
-        await _file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 4));
-        await _file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 4));
+        await _file.WriteAsync(record.ToByteArray());
         _numberOfRows++;
     }
 

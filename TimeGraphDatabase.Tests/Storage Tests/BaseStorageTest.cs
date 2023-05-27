@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using TimeGraphDatabase.Engine;
 
 namespace TimeGraphDatabase.Tests;
@@ -13,18 +14,20 @@ public abstract class BaseStorageTest
     
     protected static IEnumerable<byte> IsRow(ulong i, uint i1, uint i2, uint i3)
     {
-        return BitConverter.GetBytes(i)
+        return BitConverter.GetBytes(BinaryPrimitives.ReverseEndianness(i))
             .Concat(BitConverter.GetBytes(i1))
             .Concat(BitConverter.GetBytes(i2))
             .Concat(BitConverter.GetBytes(i3));
     }
     
-    protected static IEnumerable<byte> IsRow(uint i)
+    protected static IEnumerable<byte> IsRow(ulong i)
     {
-        return BitConverter.GetBytes((ulong)i)
-            .Concat(BitConverter.GetBytes(i))
-            .Concat(BitConverter.GetBytes(i))
-            .Concat(BitConverter.GetBytes(i));
+        var timestamp = (i == 0) ? 0 : (ulong)new DateTimeOffset(2023, 1, 1, 0, 0, 0, TimeSpan.Zero).AddDays(i)
+            .ToUnixTimeMilliseconds();
+        return BitConverter.GetBytes(BinaryPrimitives.ReverseEndianness(timestamp))
+            .Concat(BitConverter.GetBytes((uint)i))
+            .Concat(BitConverter.GetBytes((uint)i))
+            .Concat(BitConverter.GetBytes((uint)i));
     }
 
     protected static IEnumerable<byte> IsFiller() => IsRow(0, 0, 0, 0);
@@ -33,7 +36,7 @@ public abstract class BaseStorageTest
     {
         await using var file = File.Open(Storage.BackingFilePath(), FileMode.OpenOrCreate);
         file.Seek(0, SeekOrigin.End);
-        await file.WriteAsync(BitConverter.GetBytes(record.Timestamp).AsMemory(0, 8));
+        await file.WriteAsync(BitConverter.GetBytes( BinaryPrimitives.ReverseEndianness(record.Timestamp)).AsMemory(0, 8));
         await file.WriteAsync(BitConverter.GetBytes(record.LhsId).AsMemory(0, 4));
         await file.WriteAsync(BitConverter.GetBytes(record.RhsId).AsMemory(0, 4));
         await file.WriteAsync(BitConverter.GetBytes(record.RelationshipId).AsMemory(0, 4));
@@ -43,7 +46,7 @@ public abstract class BaseStorageTest
     {
         return InsertAtEndOfTestFile(new StorageRecord
         {
-            Timestamp = value,
+            Timestamp = (value == 0) ? 0 : (ulong)new DateTimeOffset(2023,1,1,0,0,0, TimeSpan.Zero).AddDays(value).ToUnixTimeMilliseconds(),
             LhsId = value,
             RhsId = value,
             RelationshipId = value,

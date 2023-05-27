@@ -1,10 +1,12 @@
+using System.Buffers.Binary;
+
 namespace TimeGraphDatabase.Engine;
 
 public readonly record struct StorageRecord(ulong Timestamp, uint LhsId, uint RhsId, uint RelationshipId)
 {
     public byte[] ToByteArray()
     {
-        return BitConverter.GetBytes(Timestamp)
+        return BitConverter.GetBytes(BinaryPrimitives.ReverseEndianness(Timestamp))
             .Concat(BitConverter.GetBytes(LhsId))
             .Concat(BitConverter.GetBytes(RhsId))
             .Concat(BitConverter.GetBytes(RelationshipId)).ToArray();
