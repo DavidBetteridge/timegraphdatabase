@@ -287,6 +287,7 @@ public class Storage : IDisposable
         {
             // We have reached the end of the file without finding a buffer.  So we append on to the end.
             await WriteFillerAtCurrentLocation();
+            _numberOfRows++;
             mUpper++;
         }
                 
