@@ -9,6 +9,7 @@ public class Storage : IDisposable
     public static readonly int BytesPerRow = 8 + 4 + 4 + 4;
     public int FillFactor { get; init; } = 10;
     private readonly byte[] _buffer = new byte[BytesPerRow];
+
     public Storage()
     {
         if (File.Exists(BackingFilePath()))
@@ -148,6 +149,49 @@ public class Storage : IDisposable
                 }
             }
         }
+    }
+
+    public bool IsValid()
+    {
+        // Find the first populated row.
+        var p1 = 0;
+        ReadRowIntoBuffer(p1);
+        while (BufferContainsFiller() && ((p1 + 1) < _numberOfRows))
+        {
+            p1++;
+            ReadRowIntoBuffer(p1);
+        }
+
+        if ((p1 + 1) == _numberOfRows)
+            // We have reached the end, all is good :-)
+            return true;
+        
+        var shadowBuffer = new byte[BytesPerRow];
+        _buffer.CopyTo(shadowBuffer, 0);
+        
+        while (p1 < (_numberOfRows - 1))
+        {
+            // Find the next populated row
+            var p2 = p1 + 1;
+            ReadRowIntoBuffer(p2);
+            while (BufferContainsFiller() && ((p2 + 1) < _numberOfRows))
+            {
+                p2++;
+                ReadRowIntoBuffer(p2);
+            }
+
+            if (BufferContainsFiller())
+                // We have reached the end, all is good :-)
+                return true;
+
+            if (_buffer.LessThanOrEqual(shadowBuffer))
+                return false;
+
+            p1 = p2;
+            _buffer.CopyTo(shadowBuffer, 0);
+        }
+
+        return true;
     }
 
     public async ValueTask InsertRowAsync(StorageRecord record)
@@ -296,6 +340,7 @@ public class Storage : IDisposable
         if (!BufferContainsFiller() && mUpper == (_numberOfRows - 1))
         {
             // We have reached the end of the file without finding a buffer.  So we append on to the end.
+            _file.Seek(0, SeekOrigin.End); //Not really needed
             await WriteFillerAtCurrentLocation();
             _numberOfRows++;
             mUpper++;
@@ -380,7 +425,7 @@ public class Storage : IDisposable
                _buffer[6] == 0x0 &&
                _buffer[7] == 0x0;
     }
-
+    
     private void ReadRowIntoBuffer(int rowNumber)
     {
         _file.Seek(rowNumber * BytesPerRow, SeekOrigin.Begin);
