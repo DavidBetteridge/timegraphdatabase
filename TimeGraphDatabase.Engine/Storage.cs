@@ -200,14 +200,16 @@ public class Storage : IDisposable
         
         //////////////////////////////////////////////////////////////
         // Smallest value - row needs to be inserted at the start of the file.
-        ReadRowIntoBuffer(0);
+        var firstNoneFillerRowNumber = 0;
+        ReadRowIntoBuffer(firstNoneFillerRowNumber);
+        if (firstNoneFillerRowNumber < _numberOfRows && BufferContainsFiller())
+            firstNoneFillerRowNumber++;
+            ReadRowIntoBuffer(firstNoneFillerRowNumber);
         if (_buffer.GreaterThan(toInsert))
         {
             await InsertRecordBefore(0, record);
             return;
         }
-
-     //   throw new Exception("Search nneeded" + record.LhsId);
         
         //////////////////////////////////////////////////////////////
         // Now we have to insert the value mid-file.  Find the location
