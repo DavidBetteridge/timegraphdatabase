@@ -32,7 +32,7 @@ public class Storage : IDisposable
         }
         
         // How many should we have?
-        var idealNumberOfFillers = numberOfFillers / FillFactor;
+        var idealNumberOfFillers = _numberOfRows / FillFactor;
         var numberMissing = idealNumberOfFillers - numberOfFillers;
 
         if (numberMissing>0)
@@ -152,6 +152,19 @@ public class Storage : IDisposable
 
     public async ValueTask InsertRowAsync(StorageRecord record)
     {
+        var result = await InternalInsertRowAsync(record);
+        if (result.DefragRequired)
+        {
+          await DefragAsync();
+          result = await InternalInsertRowAsync(record);
+        }
+    }
+
+    private record InternalInsertRowResult(bool DefragRequired);
+    
+
+    private async ValueTask<InternalInsertRowResult> InternalInsertRowAsync(StorageRecord record)
+    {
         var toInsert = record.ToByteArray();
         
         //////////////////////////////////////////////////////////////
@@ -159,7 +172,7 @@ public class Storage : IDisposable
         if (_numberOfRows == 0)
         {
             await InsertRecordAtEndOfFile(record);
-            return;
+            return new InternalInsertRowResult(DefragRequired:false);
         }
        
         //////////////////////////////////////////////////////////////
@@ -168,7 +181,7 @@ public class Storage : IDisposable
         // Work back from the end of the file to find the first row which doesn't contain a filler.
         var lastNoneFillerRowNumber = _numberOfRows - 1;
         ReadRowIntoBuffer(lastNoneFillerRowNumber);
-        while (lastNoneFillerRowNumber >= 0 && BufferContainsFiller())
+        while (lastNoneFillerRowNumber > 0 && BufferContainsFiller())
         {
             lastNoneFillerRowNumber--;
             ReadRowIntoBuffer(lastNoneFillerRowNumber);
@@ -178,7 +191,7 @@ public class Storage : IDisposable
         {
             // The file only contains fillers.  So we can write our record anywhere.
             await OverwriteRow(record, 0);
-            return;
+            return new InternalInsertRowResult(DefragRequired:false);
         }
         
         if (_buffer.LessThan(toInsert))
@@ -188,13 +201,13 @@ public class Storage : IDisposable
             {
                 // We need to add a row to the end of the file
                 await InsertRecordAtEndOfFile(record);
-                return;
+                return new InternalInsertRowResult(DefragRequired:false);
             }
             else
             {
                 // Replace the first filler after the final populated row with our row.
                 await OverwriteRow(record, lastNoneFillerRowNumber+1);
-                return;
+                return new InternalInsertRowResult(DefragRequired:false);
             }
         }
         
@@ -207,8 +220,8 @@ public class Storage : IDisposable
             ReadRowIntoBuffer(firstNoneFillerRowNumber);
         if (_buffer.GreaterThan(toInsert))
         {
-            await InsertRecordBefore(0, record);
-            return;
+            var insertOk = await InsertRecordBefore(0, record);
+            return new InternalInsertRowResult(DefragRequired:!insertOk);
         }
         
         //////////////////////////////////////////////////////////////
@@ -261,18 +274,15 @@ public class Storage : IDisposable
             if (solutionFound)
             {
                 // Shuffle the closest filler into location 'm'
-                await InsertRecordBefore(m, record);
-                return;
+                var insertOk  =await InsertRecordBefore(m, record);
+                return new InternalInsertRowResult(DefragRequired:!insertOk);
             }
         }
 
-        if (!solutionFound)
-        {
-            throw new Exception("Failed to find insert location!");
-        }
+        throw new Exception("Failed to find insert location!");
     }
 
-    private async Task InsertRecordBefore(int rowNumber, StorageRecord record)
+    private async Task<bool> InsertRecordBefore(int rowNumber, StorageRecord record)
     {
         // Find the first filler after 'rowNumber'
         var mUpper = rowNumber;
@@ -290,7 +300,10 @@ public class Storage : IDisposable
             _numberOfRows++;
             mUpper++;
         }
-                
+
+        // Are we too fragmented
+        if ((mUpper - rowNumber) > 100) return false;
+        
         // We know have a filler at location mUpper,  which we need to shuffle back to location 'rowNumber'
         while (mUpper > rowNumber)
         {
@@ -302,6 +315,7 @@ public class Storage : IDisposable
                 
         // Insert the row at location rowNumber
         await OverwriteRow(record, rowNumber);
+        return true;
     }
 
     private async Task OverwriteRow(StorageRecord record, int m)
