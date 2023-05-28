@@ -96,6 +96,17 @@ public class InsertTests : BaseStorageTest
 
         await ThenTheFileMustContain(1, 2, 3, 4, 5, 6, 8, FILLER, 10);
     }
+    
+    [Fact]
+    public async Task RowsInsertedInReverseOrder()
+    {
+        await WhenTheRecordIsInserted(250000);
+        await WhenTheRecordIsInserted(249999);
+        await WhenTheRecordIsInserted(249998);
+        await WhenTheRecordIsInserted(249997);
+
+        await ThenTheFileMustContain(249997, 249998, 249999, 250000);
+    }
 
     private static async Task GivenAFileContaining(params uint[] rows)
     {
