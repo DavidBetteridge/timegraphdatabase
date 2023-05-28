@@ -11,27 +11,8 @@ public class InsertTests : BaseStorageTest
     [Fact]
     public async Task TheFirstRelationshipIsWrittenToTheFile()
     {
-        var record = new StorageRecord
-        {
-            Timestamp = 10000L,
-            LhsId = 10001,
-            RhsId = 10002,
-            RelationshipId = 10003
-        };
-
-        using (var storage = new Storage())
-        {
-            await storage.InsertRowAsync(record);
-        }
-
-        // Entries are in the format:  Timestamp LhsId RhsId RelationshipId
-        // ie.  each entry is 4 longs (4x8 bytes)
-        var actual = await File.ReadAllBytesAsync(Storage.BackingFilePath());
-        var expected = BitConverter.GetBytes( BinaryPrimitives.ReverseEndianness(10000L))
-            .Concat(BitConverter.GetBytes(10001))
-            .Concat(BitConverter.GetBytes(10002))
-            .Concat(BitConverter.GetBytes(10003));
-        actual.Should().BeEquivalentTo(expected);
+        await WhenTheRecordIsInserted(10000);
+        await ThenTheFileMustContain(10000);
     }
 
     [Fact]
