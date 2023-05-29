@@ -6,7 +6,6 @@ namespace TimeGraphDatabase.Tests;
 
 public class InsertTests : BaseStorageTest
 {
-    private const uint FILLER = 0;
 
     [Fact]
     public async Task TheFirstRelationshipIsWrittenToTheFile()
@@ -106,28 +105,6 @@ public class InsertTests : BaseStorageTest
         await WhenTheRecordIsInserted(249997);
 
         await ThenTheFileMustContain(249997, 249998, 249999, 250000);
-    }
-
-    private static async Task GivenAFileContaining(params uint[] rows)
-    {
-        foreach (var row in rows)
-        {
-            await InsertAtEndOfTestFile(row);
-        }
-    }
-    
-    private static async Task WhenTheRecordIsInserted(uint value)
-    {
-        using var storage = new Storage { FillFactor = 10 };
-        var timestamp = (value==FILLER) ? 0 : (ulong)new DateTimeOffset(2023, 1, 1, 0, 0, 0, TimeSpan.Zero).AddDays(value)
-            .ToUnixTimeMilliseconds();
-        await storage.InsertRowAsync(new StorageRecord
-        {
-            Timestamp = timestamp,
-            LhsId = value,
-            RhsId = value,
-            RelationshipId = value
-        });
     }
 
     private static async Task ThenTheFileMustContain(params ulong[] rows)

@@ -7,6 +7,8 @@ namespace TimeGraphDatabase.Tests;
 [Collection("storage")]
 public abstract class BaseStorageTest
 {
+    protected const uint FILLER = 0;
+
     protected BaseStorageTest()
     {
         // Given no file currently exists
@@ -78,5 +80,27 @@ public abstract class BaseStorageTest
             RhsId = value,
             RelationshipId = value,
         });
+    }
+    
+    protected static async Task WhenTheRecordIsInserted(uint value)
+    {
+        using var storage = new Storage { FillFactor = 10 };
+        var timestamp = (value==FILLER) ? 0 : (ulong)new DateTimeOffset(2023, 1, 1, 0, 0, 0, TimeSpan.Zero).AddDays(value)
+            .ToUnixTimeMilliseconds();
+        await storage.InsertRowAsync(new StorageRecord
+        {
+            Timestamp = timestamp,
+            LhsId = value,
+            RhsId = value,
+            RelationshipId = value
+        });
+    }
+    
+    protected static async Task GivenAFileContaining(params uint[] rows)
+    {
+        foreach (var row in rows)
+        {
+            await InsertAtEndOfTestFile(row);
+        }
     }
 }
