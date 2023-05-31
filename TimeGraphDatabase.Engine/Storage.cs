@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics;
 
 namespace TimeGraphDatabase.Engine;
 
@@ -106,8 +107,8 @@ public class Storage : IDisposable
 
         if (numberMissing >= 0)
         {
-            var nextRead = _numberOfRows;
-            var nextWrite = _numberOfRows;
+            var nextRead = _numberOfRows-2;
+            var nextWrite = _numberOfRows-1;
 
             while (nextWrite >= 0)
             {
@@ -134,6 +135,7 @@ public class Storage : IDisposable
                 {
                     // Write contents of nextRead to nextWrite
                     ReadRowIntoBuffer(nextRead);
+                    
                     _file.Seek(nextWrite * BytesPerRow, SeekOrigin.Begin);
                     await _file.WriteAsync(_buffer);
 
@@ -153,6 +155,13 @@ public class Storage : IDisposable
 
     public bool IsValid()
     {
+        // Check the row count
+        _file.Flush();
+        var length = new FileInfo(BackingFilePath()).Length;
+        var calculatedNumberOfRows = (int)(length / BytesPerRow);
+        if (_numberOfRows != calculatedNumberOfRows)
+            throw new Exception($"Row count is wrong!!! Should be {calculatedNumberOfRows} not {_numberOfRows}.");
+        
         // Find the first populated row.
         var p1 = 0;
         ReadRowIntoBuffer(p1);
@@ -260,8 +269,10 @@ public class Storage : IDisposable
         var firstNoneFillerRowNumber = 0;
         ReadRowIntoBuffer(firstNoneFillerRowNumber);
         if (firstNoneFillerRowNumber < _numberOfRows && BufferContainsFiller())
+        {
             firstNoneFillerRowNumber++;
             ReadRowIntoBuffer(firstNoneFillerRowNumber);
+        }
         if (_buffer.GreaterThan(toInsert))
         {
             var insertOk = await InsertRecordBefore(0, record);
@@ -347,12 +358,13 @@ public class Storage : IDisposable
         }
 
         // Are we too fragmented
-        if ((mUpper - rowNumber) > 100) return false;
+        if ((mUpper - rowNumber) > 225) return false;
         
         // We know have a filler at location mUpper,  which we need to shuffle back to location 'rowNumber'
         while (mUpper > rowNumber)
         {
             ReadRowIntoBuffer(mUpper-1);
+            Debug.Assert(mUpper < _numberOfRows);
             _file.Seek((mUpper) * BytesPerRow, SeekOrigin.Begin);
             await _file.WriteAsync(_buffer);
             mUpper--;
@@ -365,6 +377,7 @@ public class Storage : IDisposable
 
     private async Task OverwriteRow(StorageRecord record, int m)
     {
+        Debug.Assert(m < _numberOfRows);
         _file.Seek(m * BytesPerRow, SeekOrigin.Begin);
         await _file.WriteAsync(record.ToByteArray());
     }
@@ -501,7 +514,7 @@ public class Storage : IDisposable
     }
 }
 
-static class ArrayExtensions {
+internal static class ArrayExtensions {
     public static int Compare(this byte[] b1, byte[] b2) {
         return ((IStructuralComparable) b1).CompareTo(b2, Comparer<byte>.Default);
     }
