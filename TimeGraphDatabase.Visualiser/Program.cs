@@ -6,52 +6,87 @@ using TimeGraphDatabase.Engine;
 File.Delete("nodes.index");
 File.Delete("nodes.content");
 
-// var sw = new Stopwatch();
-// sw.Start();
-//
-// var numberOfRows = 5_000_000;
-// using var nodeStorage = new IdValueStorage();
-// for (int i = 0; i < numberOfRows; i++)
-// {
-//     await nodeStorage.InsertAsync(i.ToString());
-// }
-// Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to insert {numberOfRows} rows.");
-//
-// sw.Restart();
-//
-// for (int i = 0; i < numberOfRows; i++)
-// {
-//    var content = await nodeStorage.GetByIdAsync(i+1);
-//    if (content != i.ToString())
-//        throw new Exception();
-// }
-//
-// sw.Stop();
-//
-// Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to read {numberOfRows} rows.");
-//
-
-
-
 var sw = new Stopwatch();
 sw.Start();
 
 var numberOfRows = 5_000_000;
-using var nodeStorage = new IdValueStorage();
+using var nodeStorage = new NodeStorage();
 for (int i = 0; i < numberOfRows; i++)
 {
     var nodeId = await nodeStorage.InsertAsync(i.ToString());
-    var content = await nodeStorage.GetByIdAsync(nodeId);
+}
+
+Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to insert {numberOfRows} rows.");
+
+sw.Restart();
+
+for (int i = 0; i < numberOfRows; i++)
+{
+    var content = await nodeStorage.GetByIdAsync(i + 1);
     if (content != i.ToString())
         throw new Exception();
 }
 
 sw.Stop();
 
-Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to insert/read {numberOfRows} rows.");
+Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to read {numberOfRows} rows.");
+
+
+sw.Restart();
+
+for (int i = 0; i < numberOfRows; i++)
+{
+    await nodeStorage.UpdateNodeAsync(i + 1, $"Row {i+1}");
+}
+
+sw.Stop();
+
+Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to update {numberOfRows} rows (expand).");
+
+for (int i = 0; i < numberOfRows; i++)
+{
+    var content = await nodeStorage.GetByIdAsync(i + 1);
+    if (content != $"Row {i+1}")
+        throw new Exception($"Got '{content}' rather than 'Row {i+1}'");
+}
+
+
+sw.Restart();
+
+for (int i = 0; i < numberOfRows; i++)
+{
+    await nodeStorage.UpdateNodeAsync(i + 1, $"R:{i}");
+}
+
+sw.Stop();
+
+Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to update {numberOfRows} rows (inplace).");
+
+for (int i = 0; i < numberOfRows; i++)
+{
+    var content = await nodeStorage.GetByIdAsync(i + 1);
+    if (content != $"R:{i}")
+        throw new Exception();
+}
+
+
+// var sw = new Stopwatch();
+// sw.Start();
+//
+// var numberOfRows = 5_000_000;
+// using var nodeStorage = new NodeStorage();
+// for (int i = 0; i < numberOfRows; i++)
+// {
+//     var nodeId = await nodeStorage.InsertAsync(i.ToString());
+//     var content = await nodeStorage.GetByIdAsync(nodeId);
+//     if (content != i.ToString())
+//         throw new Exception();
+// }
+//
+// sw.Stop();
+//
+// Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to insert/read {numberOfRows} rows.");
 return;
-
-
 
 
 const int NumberOfRows = 2600;
@@ -64,12 +99,13 @@ using (var storage = new Storage { FillFactor = 10 })
     {
         await storage.InsertRowAsync(new StorageRecord
         {
-            Timestamp = (ulong) new DateTimeOffset(2023,1,1,0,0,0, TimeSpan.Zero).AddDays(i).ToUnixTimeMilliseconds(),
+            Timestamp = (ulong)new DateTimeOffset(2023, 1, 1, 0, 0, 0, TimeSpan.Zero).AddDays(i)
+                .ToUnixTimeMilliseconds(),
             LhsId = i,
             RhsId = i,
             RelationshipId = i
         });
-        
+
         if (!storage.IsValid())
             throw new Exception($"Failed at {i}");
     }
@@ -78,7 +114,7 @@ using (var storage = new Storage { FillFactor = 10 })
     // await storage.DefragAsync();
     // if (!storage.IsValid())
     //     throw new Exception($"Failed after defrag");
-    
+
     // await storage.InsertRowAsync(new StorageRecord
     // {
     //     Timestamp = (ulong) new DateTimeOffset(2023,1,1,0,0,0, TimeSpan.Zero).AddDays(49).ToUnixTimeMilliseconds(),
@@ -88,7 +124,6 @@ using (var storage = new Storage { FillFactor = 10 })
     // });
     // if (!storage.IsValid())
     //     throw new Exception($"Failed at manual 49");
-
 }
 
 sw.Stop();
@@ -101,7 +136,7 @@ return;
 //     await storage.DefragAsync();
 // }
 var fileContents = await File.ReadAllBytesAsync(Storage.BackingFilePath());
-    //var fileContents = await File.ReadAllBytesAsync("/Users/davidbetteridge/Personal/TimeGraphDatabase/TimeGraphDatabase.Tests/bin/Debug/net7.0/database.graph");
+//var fileContents = await File.ReadAllBytesAsync("/Users/davidbetteridge/Personal/TimeGraphDatabase/TimeGraphDatabase.Tests/bin/Debug/net7.0/database.graph");
 //var numberOfRows = fileContents.Length / Storage.BytesPerRow;
 Console.WriteLine($"{numberOfRows} rows read");
 var table = new Table();
@@ -118,16 +153,19 @@ for (var rowNumber = 1; rowNumber <= numberOfRows; rowNumber++)
 
     var timestamp = BinaryPrimitives.ReverseEndianness(BitConverter.ToUInt64(row.AsSpan()[..8]));
     var when = DateTimeOffset.FromUnixTimeMilliseconds((long)timestamp);
-    
+
     var lhs = BinaryPrimitives.ReverseEndianness(BitConverter.ToUInt32(row.AsSpan()[8..12]));
     var rhs = BinaryPrimitives.ReverseEndianness(BitConverter.ToUInt32(row.AsSpan()[12..16]));
     var relation = BinaryPrimitives.ReverseEndianness(BitConverter.ToUInt32(row.AsSpan()[16..20]));
-    
+
     if (timestamp == 0)
-        table.AddRow($"[red]{rowNumber:0000}[/]","[teal]FILLER[/]","[teal]FILLER[/]","[teal]FILLER[/]","[teal]FILLER[/]");
+        table.AddRow($"[red]{rowNumber:0000}[/]", "[teal]FILLER[/]", "[teal]FILLER[/]", "[teal]FILLER[/]",
+            "[teal]FILLER[/]");
     else
     {
-        table.AddRow($"[red]{rowNumber:0000}[/]",$"[blue]{when:O}[/]",$"[green]0x{lhs:x8} ({lhs})[/]",$"[maroon]0x{rhs:x8}[/]",$"[purple]0x{relation:x8}[/]");
+        table.AddRow($"[red]{rowNumber:0000}[/]", $"[blue]{when:O}[/]", $"[green]0x{lhs:x8} ({lhs})[/]",
+            $"[maroon]0x{rhs:x8}[/]", $"[purple]0x{relation:x8}[/]");
     }
 }
+
 AnsiConsole.Write(table);
