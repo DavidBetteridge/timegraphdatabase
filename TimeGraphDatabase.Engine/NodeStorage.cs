@@ -105,7 +105,7 @@ public class NodeStorage : IDisposable
         var contentPointer = BitConverter.ToInt64(_contentPointerBuffer);
         var contentLength = BitConverter.ToInt32(_contentLengthBuffer);
 
-        var contentBuffer = new byte[contentLength];  // We could try pro-allocating this buffer
+        var contentBuffer = new byte[contentLength];  // We could try pre-allocating this buffer
         if (_contentFile.Position != contentPointer)
             _contentFile.Seek(contentPointer, SeekOrigin.Begin);
         await _contentFile.ReadAsync(contentBuffer.AsMemory(0, contentLength));
@@ -117,5 +117,6 @@ public class NodeStorage : IDisposable
     {
         _indexFile.Dispose();
         _contentFile.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
