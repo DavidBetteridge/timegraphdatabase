@@ -53,7 +53,7 @@ public class UniqueIdLookup
             else
             {
                 _file.Seek(-4, SeekOrigin.Current); 
-                await _file.WriteAsync(listSize); 
+                await _file.WriteAsync(IntToBytes(EndOfFile)); 
                 
                 // We need to create a list at the end of the file
                 locationOfList = _file.Seek(0, SeekOrigin.End); 
