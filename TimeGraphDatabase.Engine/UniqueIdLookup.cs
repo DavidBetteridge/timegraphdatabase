@@ -13,6 +13,7 @@ public class UniqueIdLookup : IDisposable
 
     public UniqueIdLookup()
     {
+        File.Delete(BackingFilePath());
         if (File.Exists(BackingFilePath()))
             EndOfFile = (int) new FileInfo(BackingFilePath()).Length;
         else
@@ -20,6 +21,7 @@ public class UniqueIdLookup : IDisposable
             using FileStream fileStream = new FileStream(BackingFilePath(), FileMode.Create);
             byte[] buffer = new byte[1000 * 8]; // Buffer to hold the zero bytes
             fileStream.Write(buffer, 0, buffer.Length); // Write the zero bytes to the file
+            EndOfFile = 1000 * 8;
         }
         _file = File.Open(BackingFilePath(), FileMode.OpenOrCreate);
     }
@@ -34,7 +36,7 @@ public class UniqueIdLookup : IDisposable
         byte[] nodeIsAsBytes = IntToBytes(nodeId);
         
         var numberOfBuckets = 1000;
-        var rowNumber = uniqueId.GetHashCode() % numberOfBuckets;
+        var rowNumber = Math.Abs(uniqueId.GetHashCode()) % numberOfBuckets;
         
         // Find the first list which has a gap.  If no lists have any gaps
         // then we have to add a new list to the end of the file.
