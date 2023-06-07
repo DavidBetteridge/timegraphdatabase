@@ -3,17 +3,30 @@ using System.Diagnostics;
 
 namespace TimeGraphDatabase.Engine;
 
-public class UniqueIdLookup
+public class UniqueIdLookup : IDisposable
 {
     private readonly FileStream _file;
     
     private readonly byte[] _nodePointerBuffer = new byte[4];
-    private byte[] _linkedListPointerBuffer = new byte[4];
-    private long EndOfFile = 0;
+    private readonly byte[] _linkedListPointerBuffer = new byte[4];
+    private int EndOfFile = 0;
 
     public UniqueIdLookup()
     {
-        EndOfFile = 0;  //TODO
+        if (File.Exists(BackingFilePath()))
+            EndOfFile = (int) new FileInfo(BackingFilePath()).Length;
+        else
+        {
+            using FileStream fileStream = new FileStream(BackingFilePath(), FileMode.Create);
+            byte[] buffer = new byte[1000 * 8]; // Buffer to hold the zero bytes
+            fileStream.Write(buffer, 0, buffer.Length); // Write the zero bytes to the file
+        }
+        _file = File.Open(BackingFilePath(), FileMode.OpenOrCreate);
+    }
+    
+    public static string BackingFilePath()
+    {
+        return "unique.index";
     }
     
     public async Task InsertAsync(int nodeId, string uniqueId)
@@ -47,11 +60,15 @@ public class UniqueIdLookup
             await _file.ReadAsync(_linkedListPointerBuffer.AsMemory(0, 4));    // Linked list
             if (!BufferIsZero(_linkedListPointerBuffer))
             {
-                locationOfList = BitConverter.ToInt32(_linkedListPointerBuffer);
+                // We have a pointer to the next list
+                locationOfList = BytesToInt(_linkedListPointerBuffer);
                 listSize *= 2;
             }
             else
             {
+                // We need to create a new list
+                
+                // Write the location of the next list (which is the end of the file)
                 _file.Seek(-4, SeekOrigin.Current); 
                 await _file.WriteAsync(IntToBytes(EndOfFile)); 
                 
@@ -59,10 +76,15 @@ public class UniqueIdLookup
                 locationOfList = _file.Seek(0, SeekOrigin.End); 
                 Debug.Assert(locationOfList==listSize);
                 
+                // Write our node to the file
                 await _file.WriteAsync(nodeIsAsBytes); 
+
+                // Write the rest of the entries as zeros
                 listSize *= 2;
                 for (int gapNumber = 1; gapNumber < listSize; gapNumber++)
                     await _file.WriteAsync(IntToBytes(0)); 
+                
+                // Write zero for the location of the following list.
                 await _file.WriteAsync(IntToBytes(0));
                 EndOfFile += (listSize * 4) + 4;
                 return;
@@ -78,12 +100,12 @@ public class UniqueIdLookup
             return BitConverter.GetBytes(value);
     }
 
-    private static byte[] LongToBytes(long value)
+    private static int BytesToInt(byte[] value)
     {
         if (BitConverter.IsLittleEndian)
-            return BitConverter.GetBytes(BinaryPrimitives.ReverseEndianness(value));
+            return  BinaryPrimitives.ReverseEndianness(BitConverter.ToInt32(value));
         else
-            return BitConverter.GetBytes(value);
+            return BitConverter.ToInt32(value);
     }
     
     private bool BufferIsZero(byte[] buffer)
@@ -91,10 +113,11 @@ public class UniqueIdLookup
         return buffer[0] == 0x0 &&
                buffer[1] == 0x0 &&
                buffer[2] == 0x0 &&
-               buffer[3] == 0x0 &&
-               buffer[4] == 0x0 &&
-               buffer[5] == 0x0 &&
-               buffer[6] == 0x0 &&
-               buffer[7] == 0x0;
+               buffer[3] == 0x0;
+    }
+
+    public void Dispose()
+    {
+        _file.Dispose();
     }
 }

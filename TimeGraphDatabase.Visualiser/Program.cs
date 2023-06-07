@@ -9,7 +9,20 @@ File.Delete("nodes.content");
 var sw = new Stopwatch();
 sw.Start();
 
+
 var numberOfRows = 5_000_000;
+using var uniqueIdLookup = new UniqueIdLookup();
+for (int i = 0; i < numberOfRows; i++)
+{
+    await uniqueIdLookup.InsertAsync(1, i.ToString());
+}
+
+sw.Stop();
+
+Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to write {numberOfRows} rows.");
+
+return;
+
 using var nodeStorage = new NodeStorage();
 for (int i = 0; i < numberOfRows; i++)
 {
