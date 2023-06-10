@@ -2,6 +2,10 @@
 using System.Diagnostics;
 using Spectre.Console;
 using TimeGraphDatabase.Engine;
+using TimeGraphDatabase.Visualiser;
+
+// FileSeekSpeedTest.Test();
+// return;
 
 File.Delete("nodes.index");
 File.Delete("nodes.content");
@@ -10,17 +14,29 @@ var sw = new Stopwatch();
 sw.Start();
 
 
-var numberOfRows = 5_000_000;
+var numberOfRows = 100; //5_000_000;
 using var uniqueIdLookup = new UniqueIdLookup();
 for (int i = 0; i < numberOfRows; i++)
 {
-    await uniqueIdLookup.InsertAsync(1, i.ToString());
+    await uniqueIdLookup.InsertAsync(i, i.ToString());
 }
 
 sw.Stop();
 
 Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to write {numberOfRows} rows.");
+sw.Start();
 
+for (int i = 0; i < numberOfRows; i++)
+{
+    var matches = uniqueIdLookup.FindAsync(i.ToString());
+    await foreach (var match in matches)
+    {
+        Console.WriteLine(match);
+    }
+}
+
+sw.Stop();
+Console.WriteLine($"{sw.Elapsed.TotalSeconds}s to read {numberOfRows} rows.");
 return;
 
 using var nodeStorage = new NodeStorage();

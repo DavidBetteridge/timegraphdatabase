@@ -9,19 +9,20 @@ public class UniqueIdLookup : IDisposable
     
     private readonly byte[] _nodePointerBuffer = new byte[4];
     private readonly byte[] _linkedListPointerBuffer = new byte[4];
-    private int EndOfFile = 0;
-
+    private int _endOfFile = 0;
+    private int _numberOfBuckets = 1000;
+    
     public UniqueIdLookup()
     {
         File.Delete(BackingFilePath());
         if (File.Exists(BackingFilePath()))
-            EndOfFile = (int) new FileInfo(BackingFilePath()).Length;
+            _endOfFile = (int) new FileInfo(BackingFilePath()).Length;
         else
         {
             using FileStream fileStream = new FileStream(BackingFilePath(), FileMode.Create);
             byte[] buffer = new byte[1000 * 8]; // Buffer to hold the zero bytes
             fileStream.Write(buffer, 0, buffer.Length); // Write the zero bytes to the file
-            EndOfFile = 1000 * 8;
+            _endOfFile = 1000 * 8;
         }
         _file = File.Open(BackingFilePath(), FileMode.OpenOrCreate);
     }
@@ -30,13 +31,45 @@ public class UniqueIdLookup : IDisposable
     {
         return "unique.index";
     }
-    
+
+    public async IAsyncEnumerable<int> FindAsync(string uniqueId)
+    {
+        var rowNumber = Math.Abs(uniqueId.GetHashCode()) % _numberOfBuckets;
+        var listSize = 1; // The first list has a single space plus a pointer to the next list.
+        var rowLength = (listSize * 4) + 4; 
+        int locationOfList = rowNumber * rowLength;
+
+        while (true)
+        {
+            // Move to the start of the list
+            if (_file.Position != locationOfList)
+                _file.Seek(locationOfList, SeekOrigin.Begin);
+            
+            // Check all the values in this list
+            for (var gapNumber = 0; gapNumber < listSize; gapNumber++)
+            {
+                await _file.ReadAsync(_nodePointerBuffer.AsMemory(0, 4));
+                if (!BufferIsZero(_nodePointerBuffer))
+                {
+                    locationOfList = BytesToInt(_nodePointerBuffer);
+                    yield return locationOfList;
+                }
+            }
+
+            // Node pointer
+            await _file.ReadAsync(_linkedListPointerBuffer.AsMemory(0, 4)); // Linked list
+            if (BufferIsZero(_linkedListPointerBuffer)) break;
+            
+            // Move to the next list
+            locationOfList = BytesToInt(_linkedListPointerBuffer);
+            listSize *= 2;
+        }
+    }
+
     public async Task InsertAsync(int nodeId, string uniqueId)
     {
         byte[] nodeIsAsBytes = IntToBytes(nodeId);
-        
-        var numberOfBuckets = 1000;
-        var rowNumber = Math.Abs(uniqueId.GetHashCode()) % numberOfBuckets;
+        var rowNumber = Math.Abs(uniqueId.GetHashCode()) % _numberOfBuckets;
         
         // Find the first list which has a gap.  If no lists have any gaps
         // then we have to add a new list to the end of the file.
@@ -53,6 +86,7 @@ public class UniqueIdLookup : IDisposable
                 await _file.ReadAsync(_nodePointerBuffer.AsMemory(0, 4));
                 if (BufferIsZero(_nodePointerBuffer))
                 {
+                    _file.Seek(-4, SeekOrigin.Current); 
                     await _file.WriteAsync(nodeIsAsBytes);   // Int  (4 bytes)
                     return;
                 }
@@ -72,11 +106,11 @@ public class UniqueIdLookup : IDisposable
                 
                 // Write the location of the next list (which is the end of the file)
                 _file.Seek(-4, SeekOrigin.Current); 
-                await _file.WriteAsync(IntToBytes(EndOfFile)); 
+                await _file.WriteAsync(IntToBytes(_endOfFile)); 
                 
                 // We need to create a list at the end of the file
                 locationOfList = _file.Seek(0, SeekOrigin.End); 
-                Debug.Assert(locationOfList==listSize);
+                Debug.Assert(locationOfList==_endOfFile);
                 
                 // Write our node to the file
                 await _file.WriteAsync(nodeIsAsBytes); 
@@ -88,7 +122,7 @@ public class UniqueIdLookup : IDisposable
                 
                 // Write zero for the location of the following list.
                 await _file.WriteAsync(IntToBytes(0));
-                EndOfFile += (listSize * 4) + 4;
+                _endOfFile += (listSize * 4) + 4;
                 return;
             }
         }
