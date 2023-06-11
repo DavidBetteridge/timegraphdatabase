@@ -66,6 +66,56 @@ public class UniqueIdLookup : IDisposable
         }
     }
 
+    public async Task UpdateAsync(int nodeId, string originalUniqueId, string replacementUniqueId)
+    {
+        var originalRowNumber = Math.Abs(originalUniqueId.GetHashCode()) % _numberOfBuckets;
+        var replacementRowNumber = Math.Abs(replacementUniqueId.GetHashCode()) % _numberOfBuckets;
+        if (originalRowNumber == replacementRowNumber) return;  // They both hash to the same thing,  no update needed
+
+        await DeleteAsync(nodeId, originalUniqueId);
+        await InsertAsync(nodeId, replacementUniqueId);
+    }
+    
+    public async Task<bool> DeleteAsync(int nodeId, string uniqueId)
+    {
+        var rowNumber = Math.Abs(uniqueId.GetHashCode()) % _numberOfBuckets;
+        var listSize = 1; // The first list has a single space plus a pointer to the next list.
+        var rowLength = (listSize * 4) + 4; 
+        int locationOfList = rowNumber * rowLength;
+
+        while (true)
+        {
+            // Move to the start of the list
+            if (_file.Position != locationOfList)
+                _file.Seek(locationOfList, SeekOrigin.Begin);
+            
+            // Check all the values in this list
+            for (var gapNumber = 0; gapNumber < listSize; gapNumber++)
+            {
+                await _file.ReadAsync(_nodePointerBuffer.AsMemory(0, 4));
+                if (!BufferIsZero(_nodePointerBuffer))
+                {
+                    locationOfList = BytesToInt(_nodePointerBuffer);
+                    if (nodeId == locationOfList)
+                    {
+                        // We have found our entry
+                        _file.Seek(-4, SeekOrigin.Current); 
+                        await _file.WriteAsync(IntToBytes(0));
+                        return true;
+                    }
+                }
+            }
+
+            // Node pointer
+            await _file.ReadAsync(_linkedListPointerBuffer.AsMemory(0, 4)); // Linked list
+            if (BufferIsZero(_linkedListPointerBuffer)) return false;
+            
+            // Move to the next list
+            locationOfList = BytesToInt(_linkedListPointerBuffer);
+            listSize *= 2;
+        }
+    }
+
     public async Task InsertAsync(int nodeId, string uniqueId)
     {
         byte[] nodeIsAsBytes = IntToBytes(nodeId);
