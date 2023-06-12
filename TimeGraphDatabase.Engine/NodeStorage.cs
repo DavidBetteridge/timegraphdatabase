@@ -68,7 +68,7 @@ public class NodeStorage : IDisposable
     }
     
 
-    public async Task<long> InsertAsync(string text)
+    public async Task<int> InsertAsync(string text)
     {
         var bytes = Encoding.Unicode.GetBytes(text);
         var contentLength = bytes.Length;
@@ -90,7 +90,7 @@ public class NodeStorage : IDisposable
         _indexFileSize += 12;
         
         var indexFileSize = _indexFile.Position;
-        return indexFileSize / (8 + 4);  // 1 based node Id
+        return (int)indexFileSize / (8 + 4);  // 1 based node Id
     }
 
     public async Task<string> GetByIdAsync(long nodeId)
